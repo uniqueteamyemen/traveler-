@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile representing travelers, drivers, and transport operators",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier of the user" },
+        "email": { "type": "string", "description": "Email address" },
+        "displayName": { "type": "string", "description": "Full display name" },
+        "photoURL": { "type": "string", "description": "Avatar photo URL" },
+        "phoneNumber": { "type": "string", "description": "Phone or WhatsApp number" },
+        "role": { "type": "string", "enum": ["passenger", "driver", "transport_company", "family"], "description": "User role in the app" },
+        "governorate": { "type": "string", "description": "Governorate of residence" },
+        "isDriverVerified": { "type": "boolean", "description": "Whether the driver is verified" },
+        "createdAt": { "type": "string", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "displayName", "role"]
+    },
+    "IntercityListing": {
+      "title": "IntercityListing",
+      "description": "Scheduled intercity trip listing between Yemeni governorates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Listing ID" },
+        "driverName": { "type": "string", "description": "Name of the captain/driver" },
+        "driverPhone": { "type": "string", "description": "Driver contact number" },
+        "driverWhatsapp": { "type": "string", "description": "Driver WhatsApp number" },
+        "fromGovernorate": { "type": "string", "description": "Origin governorate" },
+        "fromCity": { "type": "string", "description": "Origin city" },
+        "toGovernorate": { "type": "string", "description": "Destination governorate" },
+        "toCity": { "type": "string", "description": "Destination city" },
+        "departureDate": { "type": "string", "description": "Date of departure" },
+        "departureTime": { "type": "string", "description": "Time of departure" },
+        "vehicleType": { "type": "string", "description": "Type of vehicle (e.g. suv_4x4, large_bus)" },
+        "vehicleModel": { "type": "string", "description": "Model of the vehicle" },
+        "vehiclePlateNumber": { "type": "string", "description": "License plate number" },
+        "availableSeats": { "type": "number", "description": "Currently available seats" },
+        "totalSeats": { "type": "number", "description": "Total vehicle passenger capacity" },
+        "pricePerSeat": { "type": "number", "description": "Price per seat" },
+        "priceFullCar": { "type": "number", "description": "Price for full car charter" },
+        "currency": { "type": "string", "description": "Currency code" },
+        "familyTrackingCode": { "type": "string", "description": "Unique code for family tracking" }
+      },
+      "required": ["id", "driverName", "fromGovernorate", "toGovernorate", "pricePerSeat"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Passenger ticket or full vehicle reservation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Booking ticket ID" },
+        "listingId": { "type": "string", "description": "Associated listing ID" },
+        "passengerName": { "type": "string", "description": "Primary passenger name" },
+        "passengerPhone": { "type": "string", "description": "Passenger phone number" },
+        "seatsCount": { "type": "number", "description": "Number of seats booked" },
+        "isFullCar": { "type": "boolean", "description": "Whether this is a full vehicle charter" },
+        "totalPrice": { "type": "number", "description": "Total payment amount" },
+        "currency": { "type": "string", "description": "Currency of payment" },
+        "trackingCode": { "type": "string", "description": "Tracking code" },
+        "status": { "type": "string", "enum": ["confirmed", "in_progress", "completed", "cancelled"], "description": "Status of the booking" },
+        "createdAt": { "type": "string", "description": "Booking timestamp" }
+      },
+      "required": ["id", "passengerName", "passengerPhone", "seatsCount"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "Multi-day travel plan and itinerary",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Trip ID" },
+        "title": { "type": "string", "description": "Trip title in English" },
+        "titleAr": { "type": "string", "description": "Trip title in Arabic" },
+        "startDate": { "type": "string", "description": "Trip start date" },
+        "endDate": { "type": "string", "description": "Trip end date" },
+        "destination": { "type": "string", "description": "Primary destination" },
+        "trackingCode": { "type": "string", "description": "Family safety live tracking code" }
+      },
+      "required": ["id", "titleAr"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Real-time alert or transit notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Notification ID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "titleAr": { "type": "string", "description": "Arabic notification title" },
+        "message": { "type": "string", "description": "Notification body" },
+        "messageAr": { "type": "string", "description": "Arabic notification body" },
+        "type": { "type": "string", "description": "Type of notification" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"], "description": "Priority level" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" },
+        "isRead": { "type": "boolean", "description": "Whether notification was read" }
+      },
+      "required": ["id", "titleAr", "messageAr", "priority"]
+    },
+    "RoadPassAlert": {
+      "title": "RoadPassAlert",
+      "description": "Live status of mountain passes and national highways",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Alert ID" },
+        "passNameAr": { "type": "string", "description": "Arabic name of the road pass" },
+        "passNameEn": { "type": "string", "description": "English name of the road pass" },
+        "route": { "type": "string", "description": "Route description" },
+        "status": { "type": "string", "description": "Road condition status" },
+        "statusLabelAr": { "type": "string", "description": "Arabic status label" },
+        "reportedAt": { "type": "string", "description": "Last report time" },
+        "descriptionAr": { "type": "string", "description": "Detailed Arabic status description" },
+        "governorate": { "type": "string", "description": "Governorate where pass is located" }
+      },
+      "required": ["id", "passNameAr", "status", "governorate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile collection"
+    },
+    "/intercityListings/{listingId}": {
+      "schema": "IntercityListing",
+      "description": "Intercity transit listings"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Passenger ticket bookings"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Multi-day itineraries"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "Real-time alerts and notifications"
+    },
+    "/roadAlerts/{alertId}": {
+      "schema": "RoadPassAlert",
+      "description": "Mountain pass and highway status"
+    }
+  }
+}

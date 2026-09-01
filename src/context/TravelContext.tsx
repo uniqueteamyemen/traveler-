@@ -12,24 +12,26 @@ import {
   PlannedStop,
   AppNotification,
   NotificationType,
-  NotificationPriority
+  NotificationPriority,
+  UserProfile,
+  UserRole,
+  RoadPassAlert,
+  TabType
 } from '../types/travel';
 import { loadTrips, saveTrips, getSavedActiveTripId, saveActiveTripId, getSavedLanguage, saveLanguage, getSavedTheme, saveTheme } from '../utils/storage';
 import { INITIAL_INTERCITY_TRIPS } from '../data/yemenData';
 import { playNotificationChime } from '../utils/audioChime';
+import { 
+  authService, 
+  listingsService, 
+  tripsService, 
+  notificationsService, 
+  roadPassesService,
+  INITIAL_ROAD_PASSES 
+} from '../services/firebaseService';
+import { FirebaseUser } from '../lib/firebase';
 
-export type TabType = 
-  | 'overview' 
-  | 'intercity_hub' // سوق وحجز الرحلات بين المحافظات الـ 22
-  | 'fixed_plan'     // خطة السير الثابتة وأمان العائلة
-  | 'itinerary'      // الجدول الزمني والأنشطة
-  | 'map'            // خريطة المسار اليمني
-  | 'driver_portal'  // بوابة السائقين والشركات
-  | 'bookings'       // التذاكر والحجوزات
-  | 'expenses'       // المصاريف والقطة بالريال اليمني/السعودي/الدولار
-  | 'documents'      // خزينة الوثائق
-  | 'packing'        // قائمة حقيبة السفر
-  | 'stories';       // بداية القصة والذكريات التراثية
+export type { TabType };
 
 interface TravelContextType {
   trips: Trip[];
@@ -44,6 +46,19 @@ interface TravelContextType {
   toggleLang: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+
+  // Cloud Auth & User Roles
+  currentUser: FirebaseUser | null;
+  userProfile: UserProfile | null;
+  isAuthLoading: boolean;
+  loginWithGoogle: () => Promise<void>;
+  loginGuest: (role?: UserRole) => Promise<void>;
+  logout: () => Promise<void>;
+  updateUserRole: (role: UserRole, driverData?: Partial<UserProfile>) => Promise<void>;
+
+  // Real-Time Road Alerts
+  roadAlerts: RoadPassAlert[];
+  updateRoadAlertStatus: (alert: RoadPassAlert) => Promise<void>;
 
   // Real-Time Notifications
   notifications: AppNotification[];
@@ -113,7 +128,7 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     id: 'notif-transit-departure-1',
     title: 'Transit Departure in 35 Minutes',
     titleAr: 'تنبيه موعد الانطلاق: رحلة النقل البري بعد 35 دقيقة',
-    message: 'Toyota Land Cruiser Pronto to Hadhramaut is preparing for boarding at Sheikh Othman Station.',
+    message: 'Toyota Land Cruiser Prado to Hadhramaut is preparing for boarding at Sheikh Othman Station.',
     messageAr: 'مركبة تويوتا لاندكروزر برادو (خط عدن ➔ حضرموت) تستعد لاستقبال الركاب عند فرزة الشيخ عثمان. يرجى التواجد لتفقد الأمتعة.',
     type: 'transit_departure',
     priority: 'urgent',
@@ -140,19 +155,17 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     isRead: false
   },
   {
-    id: 'notif-stop-approaching-3',
-    title: 'Approaching Rest Stop',
-    titleAr: 'اقتراب محطة استراحة: بلحاف الساحلية',
-    message: 'Estimated 15km to the certified lunch and prayer stop with family facilities.',
-    messageAr: 'تبعد المحطة المعتمدة لتناول وجبة الغداء وصلاة الظهر حوالي 15 كم على خط السير المعتمد.',
-    type: 'stop_approaching',
+    id: 'notif-road-pass-alert-3',
+    title: 'Samarah Mountain Pass Weather Update',
+    titleAr: 'تحديث عقبة سمارة: ضباب ورذاذ مطري',
+    message: 'Fog formation reported on Samarah summit. Verified captains advise cautious descent.',
+    messageAr: 'ورد تقرير ميداني بوجود ضباب كثيف ورذاذ مطري في قمة نقيل سمارة. يرجى الالتزام بالسرعة المحددة وتشغيل مصابيح الضباب.',
+    type: 'safety_alert',
     priority: 'medium',
-    timestamp: new Date(Date.now() - 60 * 60000).toISOString(),
-    scheduledTime: '12:30 PM',
-    timeRemainingMinutes: 20,
+    timestamp: new Date(Date.now() - 40 * 60000).toISOString(),
     targetTab: 'fixed_plan',
-    locationName: 'استراحة بلحاف الساحلية، شبوة',
-    isRead: true
+    locationName: 'عقبة سمارة، إب',
+    isRead: false
   },
   {
     id: 'notif-safety-4',
@@ -174,6 +187,14 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [lang, setLangState] = useState<'ar' | 'en'>(getSavedLanguage);
   const [theme, setThemeState] = useState<'light' | 'dark'>(getSavedTheme);
+
+  // Cloud Auth & User Profile State
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Road Passes Alert State
+  const [roadAlerts, setRoadAlerts] = useState<RoadPassAlert[]>(INITIAL_ROAD_PASSES);
 
   // Real-Time Notifications State
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -213,6 +234,55 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   const isRTL = lang === 'ar';
+
+  // 1. Firebase Auth Listener
+  useEffect(() => {
+    const unsubscribe = authService.onAuthChange(async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        const profile = await authService.getUserProfile(user.uid);
+        setUserProfile(profile);
+      } else {
+        setUserProfile(null);
+      }
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Real-time Firestore Subscriptions for Listings, Trips, Notifications, and Road Passes
+  useEffect(() => {
+    const unsubListings = listingsService.subscribeToListings((cloudListings) => {
+      if (cloudListings.length > 0) {
+        setIntercityListings(cloudListings);
+      }
+    });
+
+    const unsubTrips = tripsService.subscribeToTrips((cloudTrips) => {
+      if (cloudTrips.length > 0) {
+        setTrips(cloudTrips);
+      }
+    });
+
+    const unsubNotifs = notificationsService.subscribeToNotifications((cloudNotifs) => {
+      if (cloudNotifs.length > 0) {
+        setNotifications(cloudNotifs);
+      }
+    });
+
+    const unsubRoadAlerts = roadPassesService.subscribeToRoadAlerts((alerts) => {
+      if (alerts.length > 0) {
+        setRoadAlerts(alerts);
+      }
+    });
+
+    return () => {
+      unsubListings();
+      unsubTrips();
+      unsubNotifs();
+      unsubRoadAlerts();
+    };
+  }, []);
 
   useEffect(() => {
     saveTrips(trips);
@@ -257,6 +327,49 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     saveTheme(theme);
   }, [theme]);
 
+  // Auth Action Methods
+  const loginWithGoogle = async () => {
+    const user = await authService.loginWithGoogle();
+    const profile = await authService.getUserProfile(user.uid);
+    setUserProfile(profile);
+  };
+
+  const loginGuest = async (role: UserRole = 'passenger') => {
+    const user = await authService.loginGuest(role);
+    const profile = await authService.getUserProfile(user.uid);
+    setUserProfile(profile);
+  };
+
+  const logout = async () => {
+    await authService.logout();
+    setCurrentUser(null);
+    setUserProfile(null);
+  };
+
+  const updateUserRole = async (role: UserRole, driverData?: Partial<UserProfile>) => {
+    if (!currentUser) return;
+    await authService.updateUserRole(currentUser.uid, role, driverData);
+    const updated = await authService.getUserProfile(currentUser.uid);
+    setUserProfile(updated);
+  };
+
+  const updateRoadAlertStatus = async (alert: RoadPassAlert) => {
+    await roadPassesService.updateRoadStatus(alert);
+    setRoadAlerts(prev => prev.map(a => a.id === alert.id ? alert : a));
+
+    // Broadcast safety notification to passengers and drivers
+    addNotification({
+      title: `Road Alert Update: ${alert.passNameEn}`,
+      titleAr: `تحديث طريق: ${alert.passNameAr} (${alert.statusLabelAr})`,
+      message: alert.descriptionAr,
+      messageAr: alert.descriptionAr,
+      type: 'safety_alert',
+      priority: alert.status === 'blocked_maintenance' ? 'urgent' : 'medium',
+      targetTab: 'fixed_plan',
+      locationName: alert.passNameAr
+    });
+  };
+
   // Notifications logic
   const unreadNotificationsCount = notifications.filter(n => !n.isRead).length;
 
@@ -269,12 +382,14 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     setNotifications(prev => {
-      // Prevent duplicate identical alerts within short time
       const filtered = prev.filter(n => n.id !== newNotif.id);
       return [newNotif, ...filtered];
     });
 
-    // Show live toast for high or urgent priority, or newly triggered alerts
+    // Cloud broadcast
+    notificationsService.broadcastNotification(newNotif).catch(console.warn);
+
+    // Show live toast for high or urgent priority
     setLiveToast(newNotif);
 
     if (audioNotificationEnabled) {
@@ -292,6 +407,7 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+    notificationsService.deleteNotification(id).catch(console.warn);
     if (liveToast?.id === id) {
       setLiveToast(null);
     }
@@ -367,31 +483,6 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const activeTrip = trips.find(t => t.id === activeTripId) || trips[0];
 
-  // Real-time scanner for upcoming trip activities and departures
-  useEffect(() => {
-    const scanUpcomingEvents = () => {
-      if (!activeTrip) return;
-
-      // Scan planned activities
-      const now = new Date();
-      (activeTrip.days || []).forEach(day => {
-        (day.activities || []).forEach(act => {
-          if (!act.isCompleted) {
-            const notifKey = `act-notif-${act.id}`;
-            const exists = notifications.some(n => n.id === notifKey);
-            if (!exists && act.time) {
-              // E.g. timely activity reminder
-            }
-          }
-        });
-      });
-    };
-
-    scanUpcomingEvents();
-    const interval = setInterval(scanUpcomingEvents, 60000); // scan every minute
-    return () => clearInterval(interval);
-  }, [activeTrip, notifications]);
-
   const setActiveTripId = (id: string) => {
     setActiveTripIdState(id);
     saveActiveTripId(id);
@@ -412,10 +503,12 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addTrip = (trip: Trip) => {
     setTrips(prev => [trip, ...prev]);
     setActiveTripId(trip.id);
+    tripsService.saveTrip(trip).catch(console.warn);
   };
 
   const updateTrip = (updatedTrip: Trip) => {
-    setTrips(prev => prev.map(t => (t.id === updatedTrip.id ? updatedTrip : t)));
+    setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+    tripsService.saveTrip(updatedTrip).catch(console.warn);
   };
 
   const deleteTrip = (id: string) => {
@@ -431,10 +524,9 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const approveTripPlan = (tripId: string) => {
     setTrips(prev => prev.map(t => {
       if (t.id === tripId) {
-        return {
-          ...t,
-          isPlanApproved: true
-        };
+        const updated = { ...t, isPlanApproved: true };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
       }
       return t;
     }));
@@ -443,13 +535,14 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const togglePlannedStopComplete = (tripId: string, stopId: string) => {
     setTrips(prev => prev.map(t => {
       if (t.id === tripId) {
-        const stops = (t.plannedStops || []).map(s => {
-          if (s.id === stopId) {
-            return { ...s, isCompleted: !s.isCompleted };
-          }
-          return s;
-        });
-        return { ...t, plannedStops: stops };
+        const updated = {
+          ...t,
+          plannedStops: (t.plannedStops || []).map(s => 
+            s.id === stopId ? { ...s, isCompleted: !s.isCompleted } : s
+          )
+        };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
       }
       return t;
     }));
@@ -462,7 +555,12 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
     setTrips(prev => prev.map(t => {
       if (t.id === tripId) {
-        return { ...t, plannedStops: [...(t.plannedStops || []), newStop] };
+        const updated = {
+          ...t,
+          plannedStops: [...(t.plannedStops || []), newStop]
+        };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
       }
       return t;
     }));
@@ -471,55 +569,60 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addIntercityListing = (listingData: Omit<InterCityTripListing, 'id'>) => {
     const newListing: InterCityTripListing = {
       ...listingData,
-      id: `trip-list-${Date.now()}`
+      id: `intercity-${Date.now()}`
     };
     setIntercityListings(prev => [newListing, ...prev]);
+    listingsService.addListing(newListing).catch(console.warn);
   };
 
   const bookIntercityListing = (
-    listing: InterCityTripListing,
-    seatsCount: number,
+    listing: InterCityTripListing, 
+    seatsCount: number, 
     isFullCar: boolean,
     passengerName: string,
     passengerPhone: string
   ) => {
-    // 1. Update available seats in listing
-    setIntercityListings(prev => prev.map(item => {
-      if (item.id === listing.id) {
-        const newAvailable = isFullCar ? 0 : Math.max(0, item.availableSeats - seatsCount);
-        return { ...item, availableSeats: newAvailable };
+    const actualSeats = isFullCar ? listing.totalSeats : seatsCount;
+    setIntercityListings(prev => prev.map(l => {
+      if (l.id === listing.id) {
+        const updatedAvailable = Math.max(0, l.availableSeats - actualSeats);
+        const updated = {
+          ...l,
+          availableSeats: updatedAvailable,
+          isFullyBooked: updatedAvailable === 0
+        };
+        listingsService.addListing(updated).catch(console.warn);
+        return updated;
       }
-      return item;
+      return l;
     }));
 
-    // 2. Create or associate with active trip
-    const cost = isFullCar ? listing.priceFullCar : listing.pricePerSeat * seatsCount;
-    const newBooking: Booking = {
-      id: `bk-inter-${Date.now()}`,
-      type: listing.vehicleType === 'large_bus' ? 'bus' : 'intercity_car',
-      provider: listing.operatorType === 'company' ? (listing.companyName || 'شركة نقل معتمدة') : listing.driverName,
-      title: `رحلة بين المحافظات: ${listing.fromGovernorate} ➔ ${listing.toGovernorate}`,
-      referenceNumber: `YEM-${Math.floor(100000 + Math.random() * 900000)}`,
-      startDate: listing.departureDate,
-      startTime: listing.departureTime,
-      departureLocation: `${listing.fromGovernorate} — ${listing.fromCity}`,
-      arrivalLocation: `${listing.toGovernorate} — ${listing.toCity}`,
-      cost: cost,
-      currency: listing.currency,
-      status: 'confirmed',
-      driverName: listing.driverName,
-      driverPhone: listing.driverPhone,
-      vehiclePlate: listing.vehiclePlateNumber,
-      seatNumber: isFullCar ? 'استئجار سيارة كاملة خاصة' : `عدد المقاعد: ${seatsCount}`,
-      trackingCode: listing.familyTrackingCode,
-      isTripPlanApprovedByPassenger: true,
-      notes: `المسافر: ${passengerName} (${passengerPhone}) - خطة سير ثابتة وضمان سيارة بديلة.`
-    };
-
     if (activeTrip) {
+      const modeLabel = isFullCar 
+        ? 'حجز سيارة كاملة خاصة VIP' 
+        : `حجز بالنفر (${seatsCount} ${seatsCount > 1 ? 'مقاعد' : 'مقعد'})`;
+
+      const newBooking: Booking = {
+        id: `book-${Date.now()}`,
+        type: listing.vehicleType === 'large_bus' ? 'bus' : 'intercity_car',
+        title: `${modeLabel}: ${listing.vehicleModel} (${listing.fromGovernorate} ➔ ${listing.toGovernorate})`,
+        provider: listing.operatorType === 'company' ? (listing.companyName || 'شركة نقل معتمدة') : `الكابتن: ${listing.driverName}`,
+        referenceNumber: `YEM-${Math.floor(100000 + Math.random() * 900000)}`,
+        status: 'confirmed',
+        startDate: listing.departureDate || new Date().toISOString().split('T')[0],
+        startTime: listing.departureTime,
+        cost: (isFullCar ? listing.priceFullCar : listing.pricePerSeat * seatsCount),
+        currency: listing.currency,
+        driverName: listing.driverName,
+        driverPhone: listing.driverPhone,
+        bookingMode: isFullCar ? 'full_car' : 'seat',
+        seatsBooked: isFullCar ? listing.totalSeats : seatsCount,
+        notes: `نوع الحجز: ${modeLabel} | الراكب: ${passengerName} | هاتف: ${passengerPhone} | كود تتبع الأمان نشط: ${listing.familyTrackingCode}`
+      };
+
       setTrips(prev => prev.map(t => {
         if (t.id === activeTrip.id) {
-          return {
+          const updatedTrip = {
             ...t,
             bookings: [newBooking, ...(t.bookings || [])],
             assignedDriver: {
@@ -527,18 +630,18 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               phone: listing.driverPhone,
               whatsapp: listing.driverWhatsapp,
               vehicleModel: listing.vehicleModel,
-              plateNumber: listing.vehiclePlateNumber,
+              plateNumber: 'لوحة نقل معتمدة',
               isVerified: listing.isVerifiedDriver,
               hasBackupCarCommitment: listing.hasBackupCarCommitment
-            },
-            plannedStops: listing.plannedStops || t.plannedStops
+            }
           };
+          tripsService.saveTrip(updatedTrip).catch(console.warn);
+          return updatedTrip;
         }
         return t;
       }));
     }
 
-    // Trigger instant booking notification alert
     addNotification({
       title: `Transit Departure Confirmed: ${listing.fromGovernorate} ➔ ${listing.toGovernorate}`,
       titleAr: `تم تأكيد حجز رحلة النقل: ${listing.fromGovernorate} ➔ ${listing.toGovernorate}`,
@@ -554,35 +657,43 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addDay = (tripId: string, title?: string, titleAr?: string) => {
     setTrips(prev => prev.map(trip => {
-      if (trip.id !== tripId) return trip;
-      const nextDayNum = (trip.days?.length || 0) + 1;
-      const newDay: DayItinerary = {
-        id: `day-${Date.now()}`,
-        dayNumber: nextDayNum,
-        date: new Date(new Date(trip.startDate).getTime() + (nextDayNum - 1) * 86400000).toISOString().split('T')[0],
-        title: title || `Day ${nextDayNum} Exploration`,
-        titleAr: titleAr || `اليوم ${nextDayNum}: استكشاف وأنشطة`,
-        activities: []
-      };
-      return { ...trip, days: [...(trip.days || []), newDay] };
+      if (trip.id === tripId) {
+        const newDayNumber = trip.days.length + 1;
+        const newDay: DayItinerary = {
+          id: `day-${Date.now()}`,
+          dayNumber: newDayNumber,
+          date: new Date(Date.now() + (newDayNumber - 1) * 86400000).toISOString().split('T')[0],
+          title: title || `Day ${newDayNumber}`,
+          titleAr: titleAr || `اليوم ${newDayNumber}`,
+          activities: []
+        };
+        const updated = { ...trip, days: [...trip.days, newDay] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return trip;
     }));
   };
 
   const addActivity = (tripId: string, dayId: string, activityData: Omit<Activity, 'id' | 'dayId'>) => {
+    const newActivity: Activity = {
+      ...activityData,
+      id: `act-${Date.now()}`,
+      dayId: dayId,
+      isCompleted: false
+    };
+
     setTrips(prev => prev.map(trip => {
       if (trip.id !== tripId) return trip;
-      const newAct: Activity = {
-        ...activityData,
-        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        dayId
-      };
-      const updatedDays = trip.days.map(d => {
-        if (d.id === dayId) {
-          return { ...d, activities: [...d.activities, newAct] };
+      const updatedDays = trip.days.map(day => {
+        if (day.id === dayId) {
+          return { ...day, activities: [...day.activities, newActivity] };
         }
-        return d;
+        return day;
       });
-      return { ...trip, days: updatedDays };
+      const updated = { ...trip, days: updatedDays };
+      tripsService.saveTrip(updated).catch(console.warn);
+      return updated;
     }));
 
     if (activityData.time) {
@@ -603,63 +714,99 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const updateActivity = (tripId: string, updatedAct: Activity) => {
     setTrips(prev => prev.map(trip => {
       if (trip.id !== tripId) return trip;
-      const updatedDays = trip.days.map(d => {
-        if (d.id === updatedAct.dayId) {
+      const updatedDays = trip.days.map(day => {
+        if (day.id === updatedAct.dayId) {
           return {
-            ...d,
-            activities: d.activities.map(a => a.id === updatedAct.id ? updatedAct : a)
+            ...day,
+            activities: day.activities.map(act => act.id === updatedAct.id ? updatedAct : act)
           };
         }
-        return d;
+        return day;
       });
-      return { ...trip, days: updatedDays };
+      const updated = { ...trip, days: updatedDays };
+      tripsService.saveTrip(updated).catch(console.warn);
+      return updated;
     }));
   };
 
   const toggleActivityComplete = (tripId: string, activityId: string) => {
     setTrips(prev => prev.map(trip => {
       if (trip.id !== tripId) return trip;
-      const updatedDays = trip.days.map(d => ({
-        ...d,
-        activities: d.activities.map(a => a.id === activityId ? { ...a, isCompleted: !a.isCompleted } : a)
+      const updatedDays = trip.days.map(day => ({
+        ...day,
+        activities: day.activities.map(act => 
+          act.id === activityId ? { ...act, isCompleted: !act.isCompleted } : act
+        )
       }));
-      return { ...trip, days: updatedDays };
+      const updated = { ...trip, days: updatedDays };
+      tripsService.saveTrip(updated).catch(console.warn);
+      return updated;
     }));
   };
 
   const deleteActivity = (tripId: string, activityId: string) => {
     setTrips(prev => prev.map(trip => {
       if (trip.id !== tripId) return trip;
-      const updatedDays = trip.days.map(d => ({
-        ...d,
-        activities: d.activities.filter(a => a.id !== activityId)
+      const updatedDays = trip.days.map(day => ({
+        ...day,
+        activities: day.activities.filter(act => act.id !== activityId)
       }));
-      return { ...trip, days: updatedDays };
+      const updated = { ...trip, days: updatedDays };
+      tripsService.saveTrip(updated).catch(console.warn);
+      return updated;
     }));
   };
 
   const addBooking = (tripId: string, bookingData: Omit<Booking, 'id'>) => {
     const newBooking: Booking = {
       ...bookingData,
-      id: `bk-${Date.now()}`
+      id: `booking-${Date.now()}`
     };
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, bookings: [newBooking, ...(t.bookings || [])] } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, bookings: [newBooking, ...(t.bookings || [])] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const deleteBooking = (tripId: string, bookingId: string) => {
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, bookings: t.bookings.filter(b => b.id !== bookingId) } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, bookings: t.bookings.filter(b => b.id !== bookingId) };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const addExpense = (tripId: string, expenseData: Omit<Expense, 'id'>) => {
-    const newExp: Expense = {
+    const newExpense: Expense = {
       ...expenseData,
       id: `exp-${Date.now()}`
     };
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, expenses: [newExp, ...(t.expenses || [])] } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, expenses: [newExpense, ...(t.expenses || [])] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const deleteExpense = (tripId: string, expenseId: string) => {
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, expenses: t.expenses.filter(e => e.id !== expenseId) } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, expenses: t.expenses.filter(e => e.id !== expenseId) };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const addDocument = (tripId: string, docData: Omit<TravelDocument, 'id'>) => {
@@ -667,11 +814,25 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       ...docData,
       id: `doc-${Date.now()}`
     };
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, documents: [newDoc, ...(t.documents || [])] } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, documents: [newDoc, ...(t.documents || [])] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const deleteDocument = (tripId: string, docId: string) => {
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, documents: t.documents.filter(d => d.id !== docId) } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, documents: t.documents.filter(d => d.id !== docId) };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const addPackingItem = (tripId: string, itemData: Omit<PackingItem, 'id'>) => {
@@ -679,47 +840,66 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       ...itemData,
       id: `pack-${Date.now()}`
     };
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, packingList: [...(t.packingList || []), newItem] } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, packingList: [...(t.packingList || []), newItem] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const togglePackingItem = (tripId: string, itemId: string) => {
     setTrips(prev => prev.map(t => {
-      if (t.id !== tripId) return t;
-      return {
-        ...t,
-        packingList: (t.packingList || []).map(p => p.id === itemId ? { ...p, isPacked: !p.isPacked } : p)
-      };
+      if (t.id === tripId) {
+        const updated = {
+          ...t,
+          packingList: (t.packingList || []).map(item => 
+            item.id === itemId ? { ...item, isPacked: !item.isPacked } : item
+          )
+        };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
     }));
   };
 
   const deletePackingItem = (tripId: string, itemId: string) => {
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, packingList: t.packingList.filter(p => p.id !== itemId) } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, packingList: (t.packingList || []).filter(item => item.id !== itemId) };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const generateSmartPacking = (tripId: string) => {
-    const defaultSmartItems: Omit<PackingItem, 'id'>[] = [
-      { name: 'Original National ID / Passport', nameAr: 'أصل البطاقة الشخصية وجواز السفر مع صور إضافية', category: 'essentials', isPacked: false, quantity: 1 },
-      { name: 'Cash in YER and SAR banknotes', nameAr: 'مبالغ نقدية كاش لتغطية المحطات البعيدة بدون شبكة', category: 'essentials', isPacked: false, quantity: 1 },
-      { name: 'High-Capacity Power Bank 20000mAh', nameAr: 'بنك طاقة عالي السعة للشحن المتنقل 20,000 مللي أمبير', category: 'electronics', isPacked: false, quantity: 2 },
-      { name: 'Offline Map & Offline Route Data', nameAr: 'تحميل مسار الرحلة للاستخدام عند انقطاع الإنترنت', category: 'electronics', isPacked: false, quantity: 1 },
-      { name: 'Car Multi-USB Rapid Charger', nameAr: 'شاحن سيارة متعدد المنافذ سريع', category: 'electronics', isPacked: false, quantity: 1 },
-      { name: 'First-Aid Kit & Motion Sickness Medicine', nameAr: 'حقيبة إسعافات أولية وأدوية دوار الطرق الجبلية', category: 'medicine', isPacked: false, quantity: 1 },
-      { name: 'Mineral Drinking Water & Dates', nameAr: 'كرتون مياه شرب معبأة وعبوة تمر طاقة للطريق', category: 'road_safety', isPacked: false, quantity: 2 },
-      { name: 'LED Torch Light & Emergency Flashlight', nameAr: 'كشاف إضاءة يدوي قوي للطوارئ', category: 'road_safety', isPacked: false, quantity: 1 },
-      { name: 'Light Layer & Comfortable Cotton Shoes', nameAr: 'ملابس قطنية مريحة مع سترة خفيفة للمناطق الجبلية', category: 'clothing', isPacked: false, quantity: 2 },
-      { name: 'Personal Hygiene & Wet Wipes Pack', nameAr: 'مناديل مبللة ومعقم يدين ومستلزمات نظافة شخصية', category: 'toiletries', isPacked: false, quantity: 2 }
+    const smartItems: Omit<PackingItem, 'id'>[] = [
+      { name: 'National ID & Original Passport / أصل الهوية وجواز السفر', category: 'essentials', isPacked: false, quantity: 1 },
+      { name: 'Security Pass Permits / تصاريح خط السير بين المحافظات', category: 'essentials', isPacked: false, quantity: 1 },
+      { name: 'Vehicle Breakdown Tool Kit & Spare Tyre / عدة السيارة والسبير', category: 'road_safety', isPacked: false, quantity: 1 },
+      { name: 'Heavy Powerbank (20,000mAh) / بنك طاقة وشواحن سيارة', category: 'electronics', isPacked: false, quantity: 1 },
+      { name: 'High-Altitude Warm Jacket for Mountain Passes / جاكيت صوف دافئ لعقبات الجبال', category: 'clothing', isPacked: false, quantity: 1 },
+      { name: 'First Aid & Altitude/Motion Sickness Pills / حبوب دوار السفر وإسعافات أولية', category: 'medicine', isPacked: false, quantity: 1 },
+      { name: 'Cash in New & Old Yemeni Rial + SAR / كاش عملة قديمة وجديدة وريال سعودي', category: 'essentials', isPacked: false, quantity: 1 },
+      { name: 'Highway Water & Dates Supply / قارورات ماء كافية وتمر للاستراحات', category: 'gear', isPacked: false, quantity: 1 }
     ];
 
     setTrips(prev => prev.map(t => {
-      if (t.id !== tripId) return t;
-      const existingNames = new Set((t.packingList || []).map(p => (p.nameAr || p.name).toLowerCase()));
-      const itemsToAdd = defaultSmartItems
-        .filter(item => !existingNames.has((item.nameAr || item.name).toLowerCase()))
-        .map((item, index) => ({
-          ...item,
-          id: `smart-${Date.now()}-${index}`
-        }));
-      return { ...t, packingList: [...(t.packingList || []), ...itemsToAdd] };
+      if (t.id === tripId) {
+        const existingNames = new Set((t.packingList || []).map(i => i.name));
+        const newItems: PackingItem[] = smartItems
+          .filter(i => !existingNames.has(i.name))
+          .map(i => ({ ...i, id: `pack-smart-${Date.now()}-${Math.random().toString(36).substring(2, 5)}` }));
+        const updated = { ...t, packingList: [...(t.packingList || []), ...newItems] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
     }));
   };
 
@@ -728,11 +908,25 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       ...storyData,
       id: `story-${Date.now()}`
     };
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, stories: [newStory, ...(t.stories || [])] } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, stories: [newStory, ...(t.stories || [])] };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const deleteStory = (tripId: string, storyId: string) => {
-    setTrips(prev => prev.map(t => t.id === tripId ? { ...t, stories: t.stories.filter(s => s.id !== storyId) } : t));
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        const updated = { ...t, stories: t.stories.filter(s => s.id !== storyId) };
+        tripsService.saveTrip(updated).catch(console.warn);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   return (
@@ -750,6 +944,15 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         toggleLang,
         theme,
         toggleTheme,
+        currentUser,
+        userProfile,
+        isAuthLoading,
+        loginWithGoogle,
+        loginGuest,
+        logout,
+        updateUserRole,
+        roadAlerts,
+        updateRoadAlertStatus,
         notifications,
         unreadNotificationsCount,
         liveToast,

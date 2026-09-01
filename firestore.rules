@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles & roles (passenger, driver, transport_company, family)
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Intercity Trips & Vehicle Listings
+    match /intercityListings/{listingId} {
+      allow read, write: if true;
+    }
+
+    // Live Bookings & Tickets
+    match /bookings/{bookingId} {
+      allow read, write: if true;
+    }
+
+    // Planned Trips & Itineraries
+    match /trips/{tripId} {
+      allow read, write: if true;
+    }
+
+    // Real-Time Live Notifications & Broadcasts
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // Highway Road Status & Mountain Pass Alerts
+    match /roadAlerts/{alertId} {
+      allow read, write: if true;
+    }
+  }
+}

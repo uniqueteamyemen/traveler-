@@ -103,10 +103,23 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ onOpenNewBooking }) 
                     {booking.referenceNumber}
                   </div>
                 </div>
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {booking.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {booking.status}
+                  </span>
+                  {booking.bookingMode && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      booking.bookingMode === 'full_car'
+                        ? 'bg-amber-200 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200'
+                        : 'bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200'
+                    }`}>
+                      {booking.bookingMode === 'full_car' 
+                        ? (lang === 'ar' ? '🚗 سيارة كاملة خاصة' : 'Full Car Charter')
+                        : (lang === 'ar' ? `💺 حجز بالنفر (${booking.seatsBooked || 1} مقاعد)` : `Per Seat (${booking.seatsBooked || 1} seats)`)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Details breakdown */}

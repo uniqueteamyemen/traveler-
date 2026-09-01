@@ -279,10 +279,10 @@ export const YEMEN_GOVERNORATES: GovernorateInfo[] = [
 export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
   {
     id: 'trip-list-1',
-    driverName: 'الكابتن / أبو بكر القريشي',
-    driverPhone: '+967 771 234 567',
-    driverWhatsapp: '+967771234567',
-    driverPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    driverName: 'الكابتن / وضاح اليافعي (دفع رباعي 4x4)',
+    driverPhone: '+967 770 123 456',
+    driverWhatsapp: '+967770123456',
+    driverPhoto: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80',
     driverRating: 4.95,
     totalTripsCompleted: 142,
     isVerifiedDriver: true,
@@ -304,6 +304,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     vehiclePhoto: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80',
     airConditioned: true,
     luggageCapacityBags: 6,
+    allowedBookingModes: ['seat', 'full_car'], // متاح بالنفر أو سيارة كاملة خاصة
     availableSeats: 3,
     totalSeats: 4,
     pricePerSeat: 45000,
@@ -311,7 +312,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     currency: 'YER',
     allowsFamilyTracking: true,
     familyTrackingCode: 'YEM-AD-MK-992',
-    notes: 'خط الساحل المعبد، الالتزام بالسرعة القانونية، تكييف ممتاز وموسيقى تراثية هادئة. قهوة وشاي ضيافة.',
+    notes: 'خط الساحل المعبد، الالتزام بالسرعة القانونية، تكييف ممتاز وموسيقى تراثية هادئة. متاح حجز مقاعد بالنفر أو حجز السيارة كاملة للعائلات.',
     plannedStops: [
       {
         id: 'st-1',
@@ -372,21 +373,22 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     departureTime: '08:00 صباحاً',
     estimatedDurationHours: 4,
     tripNature: 'outbound',
-    vehicleType: 'vip_limousine',
-    vehicleModel: 'باص هيونداي ستاريا VIP فاخر ومقاعد جلد',
+    vehicleType: 'large_bus',
+    vehicleModel: 'باص مرسيدس بولمان VIP سياحي 45 مقعد',
     vehicleYear: 2024,
     vehiclePlateNumber: 'أمانة العاصمة 22-1044',
     vehiclePhoto: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
     airConditioned: true,
-    luggageCapacityBags: 8,
-    availableSeats: 5,
-    totalSeats: 7,
+    luggageCapacityBags: 45,
+    allowedBookingModes: ['seat'], // باص نقل جماعي مخصص لحجز الأفراد بالنفر
+    availableSeats: 18,
+    totalSeats: 45,
     pricePerSeat: 15000,
-    priceFullCar: 95000,
+    priceFullCar: 0,
     currency: 'YER',
     allowsFamilyTracking: true,
     familyTrackingCode: 'YEM-SN-IBB-441',
-    notes: 'باص VIP حديث مع شواحن هواتف لكل مقعد، ومياه معدنية مجانية، وسائقين مدربين مع فحص دوري.',
+    notes: 'باص نقل جماعي كبير ومكيف للأفراد، شواحن هواتف لكل مقعد، واي فاي، وسائقين معتمدين.',
     plannedStops: [
       {
         id: 'st-b1',
@@ -419,7 +421,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
   },
   {
     id: 'trip-list-3',
-    driverName: 'الكابتن / طارق الحضرمي (رحلة راجع / Return Match)',
+    driverName: 'الكابتن / طارق الحضرمي (دفع رباعي صالون V8)',
     driverPhone: '+967 775 889 002',
     driverWhatsapp: '+967775889002',
     driverPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
@@ -444,6 +446,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     vehiclePhoto: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80',
     airConditioned: true,
     luggageCapacityBags: 6,
+    allowedBookingModes: ['seat', 'full_car'], // متاح بالنفر أو سيارة كاملة
     availableSeats: 4,
     totalSeats: 5,
     pricePerSeat: 35000,
@@ -451,7 +454,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     currency: 'YER',
     allowsFamilyTracking: true,
     familyTrackingCode: 'YEM-SE-MR-880',
-    notes: '🔥 رحلة راجع بخصم 20% لتغطية المقاعد الفارغة. سيارة دفع رباعي مريحة جداً ومجهزة بكافة وسائل السلامة.',
+    notes: '🔥 رحلة راجع بخصم 20% لتغطية المقاعد الفارغة. سيارة دفع رباعي مريحة جداً ومجهزة. متاح الحجز بالنفر أو استئجار السيارة كاملة.',
     plannedStops: [
       {
         id: 'st-r1',
@@ -501,6 +504,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     vehiclePhoto: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
     airConditioned: true,
     luggageCapacityBags: 12,
+    allowedBookingModes: ['seat', 'full_car'], // متاح بالنفر للأفراد أو حجز باص هايس كامل
     availableSeats: 7,
     totalSeats: 11,
     pricePerSeat: 18000,
@@ -508,7 +512,7 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
     currency: 'YER',
     allowsFamilyTracking: true,
     familyTrackingCode: 'YEM-AD-TZ-102',
-    notes: 'خط العند — كرش — الشريجة أو حيفان، فحص مسبق، توفير سيارة بديلة في حال أي طارئ، وسائقين ذوي خبرة بالطرق الجبلية.',
+    notes: 'خط العند — كرش — الشريجة أو حيفان، فحص مسبق، توفير سيارة بديلة في حال أي طارئ. متاح بالنفر ومتاح للمجموعات بالكامل.',
     plannedStops: [
       {
         id: 'st-t1',
@@ -527,6 +531,130 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
         estimatedTime: '10:15',
         durationMinutes: 15,
         locationName: 'مدخل محافظة تعز'
+      }
+    ]
+  },
+  {
+    id: 'trip-list-5',
+    driverName: 'شركة النجم الذهبي للنقل الجماعي',
+    driverPhone: '+967 777 990 022',
+    driverWhatsapp: '+967777990022',
+    driverPhoto: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=300&q=80',
+    driverRating: 4.89,
+    totalTripsCompleted: 2150,
+    isVerifiedDriver: true,
+    hasMechanicalPass: true,
+    hasBackupCarCommitment: true,
+    operatorType: 'company',
+    companyName: 'شركة النجم الذهبي للنقل الدولي',
+    fromGovernorate: 'صنعاء القديمة وأمانة العاصمة',
+    fromCity: 'فرع نقم / شارع تعز',
+    toGovernorate: 'حضرموت',
+    toCity: 'المكلا / سيئون',
+    departureDate: '2026-09-09',
+    departureTime: '09:00 صباحاً',
+    estimatedDurationHours: 11,
+    tripNature: 'outbound',
+    vehicleType: 'large_bus',
+    vehicleModel: 'باص مرسيدس ترافيكو VIP مكيف شاشات وشواحن',
+    vehicleYear: 2024,
+    vehiclePlateNumber: 'أمانة العاصمة 19-3301',
+    vehiclePhoto: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
+    airConditioned: true,
+    luggageCapacityBags: 50,
+    allowedBookingModes: ['seat'], // باص نقل جماعي كبير للأفراد بالنفر
+    availableSeats: 22,
+    totalSeats: 48,
+    pricePerSeat: 28000,
+    priceFullCar: 0,
+    currency: 'YER',
+    allowsFamilyTracking: true,
+    familyTrackingCode: 'YEM-SN-MK-330',
+    notes: 'باص نقل جماعي كبير للأفراد، مقاعد مريحة قابلة للإمالة، وجبة خفيفة ومشروبات ضيافة مجانية، وتوقف في استراحات راقية.',
+    plannedStops: [
+      {
+        id: 'st-nj1',
+        nameAr: 'استراحة نقيل يسلح وتفتيش روتيني',
+        nameEn: 'Yaslih Pass Rest Stop',
+        type: 'rest_food',
+        estimatedTime: '10:30',
+        durationMinutes: 20,
+        locationName: 'نقيل يسلح'
+      },
+      {
+        id: 'st-nj2',
+        nameAr: 'استراحة مأرب والرويك وتناول الغداء',
+        nameEn: 'Marib Route Lunch Stop',
+        type: 'rest_food',
+        estimatedTime: '13:45',
+        durationMinutes: 45,
+        locationName: 'محافظة مأرب'
+      },
+      {
+        id: 'st-nj3',
+        nameAr: 'استراحة العبر ومسجد الصلاة',
+        nameEn: 'Al-Abr Station',
+        type: 'prayer',
+        estimatedTime: '16:30',
+        durationMinutes: 30,
+        locationName: 'مفترق العبر'
+      }
+    ]
+  },
+  {
+    id: 'trip-list-6',
+    driverName: 'الكابتن / فؤاد الصنعاني (دفع رباعي صالون بلاتينيوم)',
+    driverPhone: '+967 771 882 334',
+    driverWhatsapp: '+967771882334',
+    driverPhoto: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80',
+    driverRating: 4.97,
+    totalTripsCompleted: 210,
+    isVerifiedDriver: true,
+    hasMechanicalPass: true,
+    hasBackupCarCommitment: true,
+    operatorType: 'individual',
+    fromGovernorate: 'صنعاء القديمة وأمانة العاصمة',
+    fromCity: 'مذبح / الستين الشمالي',
+    toGovernorate: 'مأرب',
+    toCity: 'مأرب المجمع / السد',
+    departureDate: '2026-09-08',
+    departureTime: '06:00 صباحاً',
+    estimatedDurationHours: 4,
+    tripNature: 'outbound',
+    vehicleType: 'suv_4x4',
+    vehicleModel: 'نيسان باترول بلاتينيوم V8 دفع رباعي',
+    vehicleYear: 2023,
+    vehiclePlateNumber: 'أمانة العاصمة 18-5521',
+    vehiclePhoto: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80',
+    airConditioned: true,
+    luggageCapacityBags: 6,
+    allowedBookingModes: ['seat', 'full_car'], // متاح بالنفر أو سيارة كاملة
+    availableSeats: 4,
+    totalSeats: 5,
+    pricePerSeat: 40000,
+    priceFullCar: 180000,
+    currency: 'YER',
+    allowsFamilyTracking: true,
+    familyTrackingCode: 'YEM-SN-MR-552',
+    notes: 'سيارة دفع رباعي فاخرة وحديثة جداً، مناسبة للطرق الصحراوية والجبلية، سائق ذو خبرة أمنية ومعرفة تامة بالمسارات. متاح بالنفر أو سيارة كاملة.',
+    plannedStops: [
+      {
+        id: 'st-fd1',
+        nameAr: 'استراحة نقيل بن غيلان ونهم',
+        nameEn: 'Bin Ghilan Scenic Stop',
+        type: 'scenic',
+        estimatedTime: '07:30',
+        durationMinutes: 15,
+        locationName: 'نقيل بن غيلان'
+      },
+      {
+        id: 'st-fd2',
+        nameAr: 'نقطة مدخل مأرب وتناول الإفطار',
+        nameEn: 'Marib Gate Breakfast Hub',
+        type: 'rest_food',
+        estimatedTime: '09:00',
+        durationMinutes: 30,
+        locationName: 'مدخل مأرب الغربي'
       }
     ]
   }

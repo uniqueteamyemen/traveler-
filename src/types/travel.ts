@@ -77,6 +77,7 @@ export interface InterCityTripListing {
   luggageCapacityBags: number;
   
   // Capacity & Pricing
+  allowedBookingModes?: ('seat' | 'full_car')[]; // طرق الحجز: بالنفر (أفراد) أو سيارة كاملة (مشوار خاص)
   availableSeats: number;
   totalSeats: number;
   pricePerSeat: number;
@@ -137,6 +138,8 @@ export interface Booking {
   driverPhone?: string;
   vehiclePlate?: string;
   seatNumber?: string;
+  bookingMode?: 'seat' | 'full_car'; // حجز بالنفر (أفراد) أو سيارة كاملة (مشوار خاص)
+  seatsBooked?: number;
   trackingCode?: string;
   isTripPlanApprovedByPassenger?: boolean;
   notes?: string;
@@ -262,6 +265,37 @@ export type NotificationType =
   | 'general';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type UserRole = 'passenger' | 'driver' | 'transport_company' | 'family';
+
+export interface UserProfile {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  phoneNumber?: string | null;
+  role: UserRole;
+  governorate?: string;
+  isDriverVerified?: boolean;
+  vehicleModel?: string;
+  plateNumber?: string;
+  companyName?: string;
+  rating?: number;
+  totalTrips?: number;
+  createdAt: string;
+}
+
+export interface RoadPassAlert {
+  id: string;
+  passNameAr: string;
+  passNameEn: string;
+  route: string;
+  status: 'open' | 'cautious' | 'fog_rain' | 'blocked_maintenance';
+  statusLabelAr: string;
+  reportedAt: string;
+  descriptionAr: string;
+  governorate: string;
+}
 
 export interface AppNotification {
   id: string;

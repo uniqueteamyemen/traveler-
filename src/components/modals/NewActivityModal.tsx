@@ -118,7 +118,7 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({ isOpen, onCl
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Alhambra Palace & Gardens Tour"
+              placeholder="e.g., Shibam Mud Skyscrapers Tour & Honey Tasting"
               className="w-full px-3 py-2 text-xs rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-white"
             />
           </div>
@@ -164,7 +164,7 @@ export const NewActivityModal: React.FC<NewActivityModalProps> = ({ isOpen, onCl
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Granada, Spain"
+              placeholder="حضرموت — شبام / المكلا"
               className="w-full px-3 py-2 text-xs rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-white"
             />
           </div>

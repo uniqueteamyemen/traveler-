@@ -12,7 +12,17 @@ export const loadTrips = (): Trip[] => {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Filter out any legacy non-Yemeni demo trips
+        const filtered = parsed.filter((t: Trip) => t.id !== 'trip-andalusia-1');
+        
+        // Ensure that default initial Yemeni trips are merged if missing
+        const existingIds = new Set(filtered.map((t: Trip) => t.id));
+        const missingInitial = INITIAL_TRIPS.filter(t => !existingIds.has(t.id));
+        if (missingInitial.length > 0) {
+          const merged = [...missingInitial, ...filtered];
+          return merged;
+        }
+        return filtered.length > 0 ? filtered : INITIAL_TRIPS;
       }
     }
   } catch (e) {
@@ -31,9 +41,13 @@ export const saveTrips = (trips: Trip[]): void => {
 
 export const getSavedActiveTripId = (): string => {
   try {
-    return localStorage.getItem(ACTIVE_TRIP_KEY) || 'trip-1';
+    const saved = localStorage.getItem(ACTIVE_TRIP_KEY);
+    if (!saved || saved === 'trip-andalusia-1') {
+      return 'trip-yem-1';
+    }
+    return saved;
   } catch {
-    return 'trip-1';
+    return 'trip-yem-1';
   }
 };
 

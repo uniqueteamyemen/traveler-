@@ -16,15 +16,19 @@ import {
   ChevronDown,
   ShieldCheck,
   Car,
-  Users
+  Users,
+  AlertTriangle,
+  User
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   onOpenNewTrip: () => void;
+  onOpenAuth?: () => void;
+  onOpenRoadAlerts?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpenRoadAlerts }) => {
   const { 
     trips, 
     activeTrip, 
@@ -35,7 +39,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip }) => {
     lang, 
     toggleLang, 
     theme, 
-    toggleTheme 
+    toggleTheme,
+    currentUser,
+    userProfile,
+    roadAlerts
   } = useTravel();
 
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
@@ -137,24 +144,58 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip }) => {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             
+            {/* Road Passes & Mountain Radar Button */}
+            {onOpenRoadAlerts && (
+              <button
+                onClick={onOpenRoadAlerts}
+                title={lang === 'ar' ? 'رادار حالة الطرق والعقبات الجبلية المباشر' : 'Live Highway Radar'}
+                className="p-2 rounded-xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition text-xs font-bold flex items-center gap-1 shadow-xs"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-600 animate-pulse" />
+                <span className="hidden lg:inline text-[11px] font-extrabold">{lang === 'ar' ? 'رادار الطرق' : 'Radar'}</span>
+              </button>
+            )}
+
             {/* Real-time Notification Bell */}
             <NotificationBell />
 
+            {/* User Account / Auth Button */}
+            {onOpenAuth && (
+              <button
+                onClick={onOpenAuth}
+                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition shadow-xs ${
+                  currentUser
+                    ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
+                    : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100'
+                }`}
+                title={lang === 'ar' ? 'بوابة الحسابات والمصادقة المركزية' : 'Account & Role'}
+              >
+                {currentUser?.photoURL ? (
+                  <img src={currentUser.photoURL} alt="user" className="w-4 h-4 rounded-full" />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
+                <span className="hidden md:inline max-w-[90px] truncate">
+                  {currentUser ? (userProfile?.displayName?.split(' ')[0] || 'حسابي') : (lang === 'ar' ? 'دخول' : 'Sign In')}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={onOpenNewTrip}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{lang === 'ar' ? 'تخطيط رحلة' : 'New Journey'}</span>
+              <span className="hidden sm:inline">{lang === 'ar' ? 'تخطيط رحلة' : 'New Journey'}</span>
             </button>
 
             {/* Language Switch */}
             <button
               onClick={toggleLang}
               aria-label="Toggle language"
-              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition text-xs font-bold flex items-center gap-1 shadow-xs"
+              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition text-xs font-bold flex items-center gap-1 shadow-xs"
             >
               <Globe className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
               <span>{lang === 'ar' ? 'English' : 'عربي'}</span>
@@ -164,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip }) => {
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="p-2 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition shadow-xs"
+              className="p-2 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition shadow-xs"
             >
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </button>

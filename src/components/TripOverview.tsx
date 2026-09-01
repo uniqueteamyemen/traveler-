@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Car,
   ArrowRightLeft,
-  Share2
+  Share2,
+  Timer
 } from 'lucide-react';
 import { UpcomingEventBanner } from './UpcomingEventBanner';
 
@@ -59,9 +60,64 @@ export const TripOverview: React.FC<TripOverviewProps> = ({
   const totalStops = (activeTrip.plannedStops || []).length;
   const completedStops = (activeTrip.plannedStops || []).filter(s => s.isCompleted).length;
 
-  const startDate = new Date(activeTrip.startDate);
-  const endDate = new Date(activeTrip.endDate);
-  const durationDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  // Calculate days timeline progress based on current date relative to trip start & end dates
+  const now = new Date();
+  const todayTimestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const parseDateToMidnight = (dateStr: string) => {
+    if (!dateStr) return new Date().setHours(0, 0, 0, 0);
+    const parts = dateStr.split(/[-/]/).map(Number);
+    if (parts.length === 3 && parts[0] > 1000) {
+      return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+    }
+    const d = new Date(dateStr);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+
+  const startTimestamp = parseDateToMidnight(activeTrip.startDate);
+  const endTimestamp = parseDateToMidnight(activeTrip.endDate);
+  const oneDayMs = 1000 * 60 * 60 * 24;
+
+  const totalTripDays = Math.max(1, Math.round((endTimestamp - startTimestamp) / oneDayMs) + 1);
+
+  let completedDays = 0;
+  let remainingDays = 0;
+  let daysProgressPercent = 0;
+  let tripTimelineStatus: 'upcoming' | 'ongoing' | 'completed' = 'ongoing';
+  let tripTimelineBadge = '';
+  let tripTimelineSubtext = '';
+
+  if (todayTimestamp < startTimestamp) {
+    // Upcoming trip
+    tripTimelineStatus = 'upcoming';
+    completedDays = 0;
+    remainingDays = totalTripDays;
+    daysProgressPercent = 0;
+    const daysUntilStart = Math.ceil((startTimestamp - todayTimestamp) / oneDayMs);
+    tripTimelineBadge = lang === 'ar' ? 'تبدأ قريباً' : 'Upcoming';
+    tripTimelineSubtext = lang === 'ar' 
+      ? `تبدأ الرحلة بعد ${daysUntilStart} ${daysUntilStart === 1 ? 'يوم' : daysUntilStart === 2 ? 'يومين' : 'أيام'}`
+      : `Starts in ${daysUntilStart} day${daysUntilStart > 1 ? 's' : ''}`;
+  } else if (todayTimestamp > endTimestamp) {
+    // Completed trip
+    tripTimelineStatus = 'completed';
+    completedDays = totalTripDays;
+    remainingDays = 0;
+    daysProgressPercent = 100;
+    tripTimelineBadge = lang === 'ar' ? 'اكتملت الرحلة' : 'Completed';
+    tripTimelineSubtext = lang === 'ar' ? 'تمت جميع أيام الرحلة بنجاح (100%)' : 'All trip days completed (100%)';
+  } else {
+    // Ongoing trip
+    tripTimelineStatus = 'ongoing';
+    const dayNumber = Math.min(totalTripDays, Math.max(1, Math.floor((todayTimestamp - startTimestamp) / oneDayMs) + 1));
+    completedDays = dayNumber;
+    remainingDays = Math.max(0, totalTripDays - dayNumber);
+    daysProgressPercent = Math.min(100, Math.max(0, Math.round((completedDays / totalTripDays) * 100)));
+    tripTimelineBadge = lang === 'ar' ? 'قيد التنفيذ حالياً' : 'In Progress';
+    tripTimelineSubtext = lang === 'ar'
+      ? `اليوم ${dayNumber} من أصل ${totalTripDays} أيام (${remainingDays} ${remainingDays === 1 ? 'يوم متبقي' : 'أيام متبقية'})`
+      : `Day ${dayNumber} of ${totalTripDays} (${remainingDays} day${remainingDays === 1 ? '' : 's'} remaining)`;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -91,7 +147,7 @@ export const TripOverview: React.FC<TripOverviewProps> = ({
 
             <span className="px-2.5 py-1 rounded-full bg-stone-800/80 backdrop-blur-sm text-stone-200 border border-stone-700/50 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              {activeTrip.startDate} → {activeTrip.endDate} ({durationDays} {lang === 'ar' ? 'أيام' : 'days'})
+              {activeTrip.startDate} → {activeTrip.endDate} ({totalTripDays} {lang === 'ar' ? 'أيام' : 'days'})
             </span>
 
             {activeTrip.trackingCode && (
@@ -162,6 +218,126 @@ export const TripOverview: React.FC<TripOverviewProps> = ({
           </div>
           <ArrowRightLeft className="w-6 h-6 shrink-0 text-amber-600" />
         </button>
+      </div>
+
+      {/* Visual Trip Timeline & Days Progress Bar */}
+      <div className="bg-white dark:bg-stone-900 rounded-2xl p-5 sm:p-6 border border-stone-200 dark:border-stone-800 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100 dark:border-stone-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
+              <Timer className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-stone-900 dark:text-white">
+                  {lang === 'ar' ? 'نسبة إنجاز أيام الرحلة (الجدول الزمني)' : 'Trip Days Progress (Timeline)'}
+                </h3>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-2xs ${
+                  tripTimelineStatus === 'ongoing'
+                    ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/50'
+                    : tripTimelineStatus === 'completed'
+                    ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-300/50'
+                    : 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300/50'
+                }`}>
+                  {tripTimelineStatus === 'ongoing' && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+                  {tripTimelineBadge}
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 dark:text-stone-300 mt-1">
+                {tripTimelineSubtext}
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Percentage Display */}
+          <div className="flex items-baseline gap-2 self-start sm:self-auto bg-amber-50 dark:bg-amber-950/40 px-4 py-2 rounded-xl border border-amber-200/60 dark:border-amber-900/40">
+            <span className="text-xs font-bold text-stone-600 dark:text-stone-300">
+              {lang === 'ar' ? 'التقدم المنجز:' : 'Completed:'}
+            </span>
+            <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">
+              {daysProgressPercent}%
+            </span>
+          </div>
+        </div>
+
+        {/* Visual Progress Bar Track */}
+        <div className="space-y-2">
+          <div className="relative w-full bg-stone-100 dark:bg-stone-800 rounded-full h-3.5 sm:h-4 overflow-hidden p-0.5 shadow-inner">
+            <div 
+              className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-500 dark:from-amber-400 dark:via-amber-500 dark:to-emerald-400 transition-all duration-700 ease-out shadow-xs relative"
+              style={{ width: `${daysProgressPercent}%` }}
+            >
+              <div className="absolute inset-0 bg-white/20 rounded-full" />
+            </div>
+          </div>
+
+          {/* Day Ticks / Milestone Step Indicators */}
+          {totalTripDays > 1 && totalTripDays <= 14 && (
+            <div className="flex justify-between items-center px-1 text-[10px] text-stone-400 font-medium pt-1">
+              {Array.from({ length: totalTripDays }, (_, i) => {
+                const dayNum = i + 1;
+                const isPassed = completedDays >= dayNum;
+                const isCurrent = tripTimelineStatus === 'ongoing' && completedDays === dayNum;
+                return (
+                  <div key={dayNum} className="flex flex-col items-center gap-0.5">
+                    <span className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      isCurrent 
+                        ? 'bg-amber-600 ring-4 ring-amber-200 dark:ring-amber-900 scale-125' 
+                        : isPassed 
+                        ? 'bg-emerald-500' 
+                        : 'bg-stone-300 dark:bg-stone-700'
+                    }`} />
+                    <span className={`text-[10px] ${
+                      isCurrent 
+                        ? 'font-bold text-amber-600 dark:text-amber-400' 
+                        : isPassed 
+                        ? 'font-semibold text-stone-700 dark:text-stone-300' 
+                        : 'text-stone-400'
+                    }`}>
+                      {lang === 'ar' ? `يوم ${dayNum}` : `Day ${dayNum}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Milestone Cards: Start, Days Count, End */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/60 dark:border-stone-700/60 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] text-stone-600 dark:text-stone-300 font-semibold">{lang === 'ar' ? 'تاريخ الانطلاق' : 'Start Date'}</div>
+              <div className="text-xs font-bold text-stone-900 dark:text-white truncate">{activeTrip.startDate}</div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/60 dark:border-stone-700/60 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] text-stone-600 dark:text-stone-300 font-semibold">{lang === 'ar' ? 'الأيام المنجزة والمتبقية' : 'Days Elapsed & Remaining'}</div>
+              <div className="text-xs font-bold text-stone-900 dark:text-white">
+                {completedDays} {lang === 'ar' ? 'من' : 'of'} {totalTripDays} {lang === 'ar' ? 'أيام' : 'days'}
+                {remainingDays > 0 && <span className="text-[10px] text-amber-600 dark:text-amber-400 ms-1 font-semibold">({remainingDays} {lang === 'ar' ? 'متبقي' : 'left'})</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/60 dark:border-stone-700/60 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] text-stone-600 dark:text-stone-300 font-semibold">{lang === 'ar' ? 'تاريخ العودة / النهاية' : 'End Date'}</div>
+              <div className="text-xs font-bold text-stone-900 dark:text-white truncate">{activeTrip.endDate}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Metric Quick Glance Cards */}

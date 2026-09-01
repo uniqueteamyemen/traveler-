@@ -20,6 +20,8 @@ import { NewBookingModal } from './components/modals/NewBookingModal';
 import { NewDocumentModal } from './components/modals/NewDocumentModal';
 import { NewStoryModal } from './components/modals/NewStoryModal';
 import { LiveNotificationToast } from './components/LiveNotificationToast';
+import { AuthControlModal } from './components/modals/AuthControlModal';
+import { RoadAlertsModal } from './components/modals/RoadAlertsModal';
 
 const AppContent: React.FC = () => {
   const { activeTab, activeTrip, lang } = useTravel();
@@ -32,6 +34,8 @@ const AppContent: React.FC = () => {
   const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
   const [isNewDocumentOpen, setIsNewDocumentOpen] = useState(false);
   const [isNewStoryOpen, setIsNewStoryOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isRoadAlertsOpen, setIsRoadAlertsOpen] = useState(false);
 
   const handleOpenNewActivity = (dayId?: string) => {
     setSelectedDayForActivity(dayId);
@@ -42,7 +46,11 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex flex-col selection:bg-amber-500/20 selection:text-amber-900 dark:selection:text-amber-100">
       
       {/* Top Sticky Header */}
-      <Header onOpenNewTrip={() => setIsNewTripOpen(true)} />
+      <Header 
+        onOpenNewTrip={() => setIsNewTripOpen(true)} 
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenRoadAlerts={() => setIsRoadAlertsOpen(true)}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -120,7 +128,7 @@ const AppContent: React.FC = () => {
       <footer className="border-t border-stone-200 dark:border-stone-800 py-6 text-center text-xs text-stone-600 dark:text-stone-300">
         <p>
           {lang === 'ar' 
-            ? 'سَفَر — شبكة النقل بين محافظات اليمن الـ 22 وخطة السير الثابتة © 2026' 
+            ? 'سَفَر — شبكة النقل بين محافظات اليمن الـ 22 وخطة السير الثابتة السحابية © 2026' 
             : 'Traveler — 22 Yemeni Governorates Intercity Transit Network © 2026'}
         </p>
       </footer>
@@ -139,6 +147,8 @@ const AppContent: React.FC = () => {
       <NewBookingModal isOpen={isNewBookingOpen} onClose={() => setIsNewBookingOpen(false)} />
       <NewDocumentModal isOpen={isNewDocumentOpen} onClose={() => setIsNewDocumentOpen(false)} />
       <NewStoryModal isOpen={isNewStoryOpen} onClose={() => setIsNewStoryOpen(false)} />
+      <AuthControlModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <RoadAlertsModal isOpen={isRoadAlertsOpen} onClose={() => setIsRoadAlertsOpen(false)} />
 
     </div>
   );

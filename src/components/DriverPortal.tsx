@@ -49,6 +49,8 @@ export const DriverPortal: React.FC = () => {
   const [vehiclePlateNumber, setVehiclePlateNumber] = useState('');
   
   const [totalSeats, setTotalSeats] = useState(4);
+  const [allowSeatBooking, setAllowSeatBooking] = useState(true);
+  const [allowFullCarBooking, setAllowFullCarBooking] = useState(true);
   const [pricePerSeat, setPricePerSeat] = useState(40000);
   const [priceFullCar, setPriceFullCar] = useState(150000);
   const [currency, setCurrency] = useState<'YER' | 'SAR' | 'USD'>('YER');
@@ -82,6 +84,11 @@ export const DriverPortal: React.FC = () => {
       }
     ];
 
+    const allowedModes: ('seat' | 'full_car')[] = [];
+    if (allowSeatBooking) allowedModes.push('seat');
+    if (allowFullCarBooking) allowedModes.push('full_car');
+    if (allowedModes.length === 0) allowedModes.push('seat');
+
     addIntercityListing({
       driverName,
       driverPhone,
@@ -109,6 +116,7 @@ export const DriverPortal: React.FC = () => {
       vehiclePhoto: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80',
       airConditioned: true,
       luggageCapacityBags: 6,
+      allowedBookingModes: allowedModes,
       availableSeats: Number(totalSeats),
       totalSeats: Number(totalSeats),
       pricePerSeat: Number(pricePerSeat),
@@ -406,6 +414,34 @@ export const DriverPortal: React.FC = () => {
                 </div>
               </div>
 
+              {/* Booking Modes Supported */}
+              <div className="p-3.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 space-y-2">
+                <label className="block text-xs font-bold text-stone-900 dark:text-white">
+                  {lang === 'ar' ? 'طرق الحجز التي تقبلها في هذه الرحلة:' : 'Accepted Booking Methods:'}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allowSeatBooking}
+                      onChange={(e) => setAllowSeatBooking(e.target.checked)}
+                      className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
+                    />
+                    <span>{lang === 'ar' ? '💺 أقبل حجز أفراد (بالنفر / مقاعد مشتركة)' : 'Accept Per-Seat Bookings'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allowFullCarBooking}
+                      onChange={(e) => setAllowFullCarBooking(e.target.checked)}
+                      className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
+                    />
+                    <span>{lang === 'ar' ? '🚗 أقبل حجز سيارة كاملة (مشوار خاص)' : 'Accept Full Car Charters'}</span>
+                  </label>
+                </div>
+              </div>
+
               {/* Vehicle & Pricing */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -423,25 +459,27 @@ export const DriverPortal: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                    {lang === 'ar' ? 'سعر المقعد الفردي' : 'Seat Price'}
+                    {lang === 'ar' ? 'سعر المقعد الفردي (بالنفر)' : 'Seat Price'}
                   </label>
                   <input
                     type="number"
+                    disabled={!allowSeatBooking}
                     value={pricePerSeat}
                     onChange={(e) => setPricePerSeat(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100 disabled:opacity-40"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                    {lang === 'ar' ? 'سعر السيارة كاملة' : 'Full Car Price'}
+                    {lang === 'ar' ? 'سعر السيارة كاملة (خاص)' : 'Full Car Price'}
                   </label>
                   <input
                     type="number"
+                    disabled={!allowFullCarBooking}
                     value={priceFullCar}
                     onChange={(e) => setPriceFullCar(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100 disabled:opacity-40"
                   />
                 </div>
               </div>

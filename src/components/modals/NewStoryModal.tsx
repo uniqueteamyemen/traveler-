@@ -69,7 +69,7 @@ export const NewStoryModal: React.FC<NewStoryModalProps> = ({ isOpen, onClose })
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={lang === 'ar' ? 'مثال: لحظة الغروب الأسطورية وأول تجربة للشاي الأندلسي' : 'e.g., Golden Sunset at Alhambra & First Tea Tasting'}
+              placeholder={lang === 'ar' ? 'مثال: لحظة الغروب الأسطورية على شاطئ المكلا وتذوق الشاي الحضرمي' : 'e.g., Golden Sunset at Mukalla Corniche & Traditional Tea'}
               className="w-full px-3 py-2 text-xs rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-white"
             />
           </div>
@@ -113,7 +113,7 @@ export const NewStoryModal: React.FC<NewStoryModalProps> = ({ isOpen, onClose })
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Granada, Spain"
+                placeholder="شبام حضرموت / وادي دوعن"
                 className="w-full px-3 py-2 text-xs rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-white"
               />
             </div>
@@ -171,7 +171,7 @@ export const NewStoryModal: React.FC<NewStoryModalProps> = ({ isOpen, onClose })
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="Sunset, Alhambra, Food"
+              placeholder="غروب_المكلا, شبام, وادي_دوعن, شاي_حضرمي"
               className="w-full px-3 py-2 text-xs rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-white"
             />
           </div>
