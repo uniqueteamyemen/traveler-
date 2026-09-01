@@ -1,0 +1,6 @@
+{
+  "name": "Traveler (سَفَر) - Yemen Transit & Journey Companion",
+  "description": "Unified 22 Yemeni Governorates transportation marketplace, fixed planned journeys, family safety tracking, backup car commitment, and story memories vault.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
