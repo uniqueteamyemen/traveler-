@@ -14,15 +14,33 @@ export const loadTrips = (): Trip[] => {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Filter out any legacy non-Yemeni demo trips
         const filtered = parsed.filter((t: Trip) => t.id !== 'trip-andalusia-1');
+
+        // Sanitize any existing cached document titles
+        const sanitized = filtered.map((t: Trip) => {
+          if (t.documents && Array.isArray(t.documents)) {
+            const updatedDocs = t.documents.map(d => {
+              if (d.title && d.title.includes('الذكية')) {
+                return { 
+                  ...d, 
+                  title: d.title.replace('الذكية', 'أو جواز السفر'),
+                  notes: d.notes ? d.notes.replace('أصل البطاقة جاهز', 'أصل البطاقة أو جواز السفر جاهز') : d.notes
+                };
+              }
+              return d;
+            });
+            return { ...t, documents: updatedDocs };
+          }
+          return t;
+        });
         
         // Ensure that default initial Yemeni trips are merged if missing
-        const existingIds = new Set(filtered.map((t: Trip) => t.id));
+        const existingIds = new Set(sanitized.map((t: Trip) => t.id));
         const missingInitial = INITIAL_TRIPS.filter(t => !existingIds.has(t.id));
         if (missingInitial.length > 0) {
-          const merged = [...missingInitial, ...filtered];
+          const merged = [...missingInitial, ...sanitized];
           return merged;
         }
-        return filtered.length > 0 ? filtered : INITIAL_TRIPS;
+        return sanitized.length > 0 ? sanitized : INITIAL_TRIPS;
       }
     }
   } catch (e) {

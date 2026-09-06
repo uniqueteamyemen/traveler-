@@ -136,7 +136,9 @@ export const TripOverview: React.FC<TripOverviewProps> = ({
             {activeTrip.originGovernorate && activeTrip.destinationGovernorate ? (
               <span className="px-3 py-1 rounded-full bg-amber-600 text-white flex items-center gap-1.5 shadow-sm font-bold">
                 <Car className="w-3.5 h-3.5" />
-                {activeTrip.originGovernorate} ➔ {activeTrip.destinationGovernorate}
+                <span>{activeTrip.originGovernorate}</span>
+                <span className="text-amber-200 font-bold">{lang === 'ar' ? '←' : '➔'}</span>
+                <span>{activeTrip.destinationGovernorate}</span>
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-full bg-amber-500/90 text-stone-950 flex items-center gap-1.5 shadow-xs">
@@ -147,7 +149,10 @@ export const TripOverview: React.FC<TripOverviewProps> = ({
 
             <span className="px-2.5 py-1 rounded-full bg-stone-800/80 backdrop-blur-sm text-stone-200 border border-stone-700/50 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              {activeTrip.startDate} → {activeTrip.endDate} ({totalTripDays} {lang === 'ar' ? 'أيام' : 'days'})
+              <span>{activeTrip.startDate}</span>
+              <span className="text-amber-400 font-bold">{lang === 'ar' ? '←' : '→'}</span>
+              <span>{activeTrip.endDate}</span>
+              <span className="ms-1">({totalTripDays} {lang === 'ar' ? 'أيام' : 'days'})</span>
             </span>
 
             {activeTrip.trackingCode && (

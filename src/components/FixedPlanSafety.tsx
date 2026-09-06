@@ -21,6 +21,7 @@ import {
   Plus
 } from 'lucide-react';
 import { PlannedStop } from '../types/travel';
+import { FamilyLiveTrackingModal } from './modals/FamilyLiveTrackingModal';
 
 export const FixedPlanSafety: React.FC = () => {
   const { activeTrip, lang, approveTripPlan, togglePlannedStopComplete, addPlannedStop } = useTravel();
@@ -28,6 +29,7 @@ export const FixedPlanSafety: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedSMS, setCopiedSMS] = useState(false);
   const [showAddStopModal, setShowAddStopModal] = useState(false);
+  const [showLiveTrackingModal, setShowLiveTrackingModal] = useState(false);
 
   // New Stop State
   const [newStopNameAr, setNewStopNameAr] = useState('');
@@ -58,7 +60,7 @@ export const FixedPlanSafety: React.FC = () => {
   };
 
   const handleCopySMSUpdate = () => {
-    const msg = `تحديث رحلة سَفَر اليمنية 🇾🇪: أنا في طريقي من (${activeTrip.origin || activeTrip.originGovernorate || 'عدن'}) إلى (${activeTrip.destination || activeTrip.destinationGovernorate || 'حضرموت'}). السائق: ${activeTrip.assignedDriver?.name || 'كابتن معتمد'}. رقم التتبع: ${trackingCode}. الحمد لله كل شيء تمام والرحلة تسير وفق خطة المحطات المعتمدة.`;
+    const msg = `تحديث رحلة تطبيق المسافر (Traveler) 🇾🇪: أنا في طريقي من (${activeTrip.origin || activeTrip.originGovernorate || 'عدن'}) إلى (${activeTrip.destination || activeTrip.destinationGovernorate || 'حضرموت'}). السائق: ${activeTrip.assignedDriver?.name || 'كابتن معتمد'}. رقم التتبع: ${trackingCode}. الحمد لله كل شيء تمام والرحلة تسير وفق خطة المحطات المعتمدة.`;
     navigator.clipboard.writeText(msg);
     setCopiedSMS(true);
     setTimeout(() => setCopiedSMS(false), 2500);
@@ -201,8 +203,16 @@ export const FixedPlanSafety: React.FC = () => {
 
             <div className="pt-2 border-t border-stone-700/60 flex flex-col gap-2">
               <button
+                onClick={() => setShowLiveTrackingModal(true)}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-2"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{lang === 'ar' ? 'فتح شاشة التتبع العائلي المباشر (GPS الهاتف) 🛰️' : 'Open Live Family Tracking'}</span>
+              </button>
+
+              <button
                 onClick={handleCopyTrackingLink}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5"
+                className="w-full py-2 bg-stone-700/80 hover:bg-stone-700 text-stone-200 rounded-lg text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>{copiedCode ? (lang === 'ar' ? 'تم نسخ الرابط!' : 'Link Copied!') : (lang === 'ar' ? 'نسخ رابط التتبع للعائلة' : 'Copy Family Live Link')}</span>
@@ -210,7 +220,7 @@ export const FixedPlanSafety: React.FC = () => {
 
               <button
                 onClick={handleCopySMSUpdate}
-                className="w-full py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
+                className="w-full py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
               >
                 <Phone className="w-3.5 h-3.5 text-sky-400" />
                 <span>{copiedSMS ? (lang === 'ar' ? 'تم نسخ رسالة التحديث!' : 'SMS Copied!') : (lang === 'ar' ? 'رسالة SMS سريعة للمناطق الضعيفة' : 'Copy Weak-Signal SMS Update')}</span>
@@ -493,6 +503,13 @@ export const FixedPlanSafety: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Family Live Tracking Modal */}
+      <FamilyLiveTrackingModal
+        isOpen={showLiveTrackingModal}
+        onClose={() => setShowLiveTrackingModal(false)}
+        initialCode={trackingCode}
+      />
 
     </div>
   );

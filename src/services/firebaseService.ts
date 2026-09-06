@@ -30,16 +30,21 @@ import {
   AppNotification, 
   UserProfile, 
   UserRole,
-  RoadPassAlert 
+  RoadPassAlert,
+  TransportOffice,
+  DriverVehicle
 } from '../types/travel';
 import { INITIAL_INTERCITY_TRIPS } from '../data/yemenData';
+import { INITIAL_TRANSPORT_OFFICES } from '../data/transportOfficesData';
 
 // Collection References
 const USERS_COL = 'users';
 const LISTINGS_COL = 'intercityListings';
+const VEHICLES_COL = 'vehicles';
 const TRIPS_COL = 'trips';
 const NOTIFICATIONS_COL = 'notifications';
 const ROAD_ALERTS_COL = 'roadAlerts';
+const OFFICES_COL = 'transportOffices';
 
 // Initial Road Passes Data
 export const INITIAL_ROAD_PASSES: RoadPassAlert[] = [
@@ -47,7 +52,7 @@ export const INITIAL_ROAD_PASSES: RoadPassAlert[] = [
     id: 'pass-samarah-1',
     passNameAr: 'عقبة سمارة (إب - صنعاء)',
     passNameEn: 'Samarah Mountain Pass',
-    route: 'إب ➔ ذمار ➔ صنعاء',
+    route: 'إب ← ذمار ← صنعاء',
     status: 'fog_rain',
     statusLabelAr: 'ضباب كثيف ورذاذ مطري - قيادة بحذر',
     reportedAt: 'محدث قبل 15 دقيقة',
@@ -58,7 +63,7 @@ export const INITIAL_ROAD_PASSES: RoadPassAlert[] = [
     id: 'pass-hayjat-alabd-2',
     passNameAr: 'طريق هيجة العبد (تعز - عدن)',
     passNameEn: 'Hayjat Al-Abd Pass',
-    route: 'تعز ➔ التربة ➔ لحج ➔ عدن',
+    route: 'تعز ← التربة ← لحج ← عدن',
     status: 'cautious',
     statusLabelAr: 'سالكة بحذر مع أعمال صيانة جزئية',
     reportedAt: 'محدث قبل 40 دقيقة',
@@ -69,7 +74,7 @@ export const INITIAL_ROAD_PASSES: RoadPassAlert[] = [
     id: 'pass-alabr-3',
     passNameAr: 'خط العبر الدولي (مأرب - حضرموت - الوديعة)',
     passNameEn: 'Al-Abr Highway',
-    route: 'شبوة / مأرب ➔ العبر ➔ سيئون',
+    route: 'شبوة / مأرب ← العبر ← سيئون',
     status: 'open',
     statusLabelAr: 'مفتوح وسالك تماماً',
     reportedAt: 'محدث قبل ساعة',
@@ -80,7 +85,7 @@ export const INITIAL_ROAD_PASSES: RoadPassAlert[] = [
     id: 'pass-manakhah-4',
     passNameAr: 'عقبة مناخة (صنعاء - الحديدة)',
     passNameEn: 'Manakhah Pass',
-    route: 'صنعاء ➔ مناخة ➔ باجل ➔ الحديدة',
+    route: 'صنعاء ← مناخة ← باجل ← الحديدة',
     status: 'open',
     statusLabelAr: 'طريق سالك بحالة ممتازة',
     reportedAt: 'محدث قبل ساعتين',
@@ -130,24 +135,40 @@ export const authService = {
     customName?: string
   ): Promise<UserProfile> {
     const userRef = doc(db, USERS_COL, user.uid);
+    const isAdminEmail = Boolean(
+      user.email && (
+        user.email.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
+        user.email.toLowerCase() === 'qpjiu.sea@gmail.com'
+      )
+    );
+
     try {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        return snap.data() as UserProfile;
+        const existing = snap.data() as UserProfile;
+        if (isAdminEmail && existing.role !== 'admin') {
+          existing.role = 'admin';
+          existing.roles = ['admin', 'traveler', 'captain'];
+          await updateDoc(userRef, { role: 'admin', roles: existing.roles }).catch(console.warn);
+        }
+        return existing;
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, `${USERS_COL}/${user.uid}`);
     }
 
+    const assignedRole: UserRole = isAdminEmail ? 'admin' : role;
+
     const newProfile: UserProfile = {
       uid: user.uid,
       email: user.email,
-      displayName: user.displayName || customName || (user.isAnonymous ? 'مسافر ضيف' : 'مستخدم سَفَر'),
+      displayName: user.displayName || customName || (user.isAnonymous ? 'مسافر ضيف' : 'مستخدم المسافر'),
       photoURL: user.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
       phoneNumber: user.phoneNumber,
-      role: role,
+      role: assignedRole,
+      roles: isAdminEmail ? ['admin', 'traveler', 'captain'] : [assignedRole],
       governorate: 'عدن',
-      isDriverVerified: role === 'driver',
+      isDriverVerified: assignedRole === 'driver' || assignedRole === 'admin',
       createdAt: new Date().toISOString()
     };
 
@@ -178,6 +199,65 @@ export const authService = {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${USERS_COL}/${uid}`);
+    }
+  },
+
+  async completeUserProfile(uid: string, profileData: Partial<UserProfile>): Promise<void> {
+    const userRef = doc(db, USERS_COL, uid);
+    try {
+      await updateDoc(userRef, {
+        ...profileData,
+        isProfileComplete: true,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${USERS_COL}/${uid}`);
+      throw error;
+    }
+  },
+
+  async updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
+    const userRef = doc(db, USERS_COL, uid);
+    try {
+      await updateDoc(userRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${USERS_COL}/${uid}`);
+    }
+  }
+};
+
+// ==========================================
+// 1.5 DRIVER & VEHICLE OWNER GARAGE SERVICE
+// ==========================================
+
+export const vehiclesService = {
+  subscribeToUserVehicles(ownerId: string, callback: (vehicles: DriverVehicle[]) => void) {
+    const q = query(collection(db, VEHICLES_COL), where('ownerId', '==', ownerId));
+    return onSnapshot(q, (snapshot) => {
+      const data: DriverVehicle[] = [];
+      snapshot.forEach(docSnap => {
+        data.push({ id: docSnap.id, ...docSnap.data() } as DriverVehicle);
+      });
+      callback(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, VEHICLES_COL);
+    });
+  },
+
+  async saveVehicle(vehicle: DriverVehicle): Promise<void> {
+    try {
+      await setDoc(doc(db, VEHICLES_COL, vehicle.id), vehicle, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${VEHICLES_COL}/${vehicle.id}`);
+      throw error;
+    }
+  },
+
+  async deleteVehicle(vehicleId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, VEHICLES_COL, vehicleId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${VEHICLES_COL}/${vehicleId}`);
     }
   }
 };
@@ -239,6 +319,86 @@ export const listingsService = {
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${LISTINGS_COL}/${listingId}`);
+    }
+  },
+
+  async updateListing(listingId: string, updates: Partial<InterCityTripListing>) {
+    const ref = doc(db, LISTINGS_COL, listingId);
+    try {
+      await updateDoc(ref, updates);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${LISTINGS_COL}/${listingId}`);
+    }
+  },
+
+  async deleteListing(listingId: string) {
+    const ref = doc(db, LISTINGS_COL, listingId);
+    try {
+      await deleteDoc(ref);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${LISTINGS_COL}/${listingId}`);
+    }
+  }
+};
+
+// ==========================================
+// 2.5 TRANSPORT OFFICES & SUBSCRIPTIONS SERVICE
+// ==========================================
+
+export const transportOfficesService = {
+  subscribeToOffices(callback: (offices: TransportOffice[]) => void) {
+    const q = collection(db, OFFICES_COL);
+    return onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) {
+        callback(INITIAL_TRANSPORT_OFFICES);
+        await this.seedInitialOffices().catch(() => {});
+        return;
+      }
+      const data: TransportOffice[] = [];
+      snapshot.forEach(docSnap => {
+        data.push({ id: docSnap.id, ...docSnap.data() } as TransportOffice);
+      });
+      callback(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, OFFICES_COL);
+      callback(INITIAL_TRANSPORT_OFFICES);
+    });
+  },
+
+  async seedInitialOffices() {
+    try {
+      for (const office of INITIAL_TRANSPORT_OFFICES) {
+        await setDoc(doc(db, OFFICES_COL, office.id), office, { merge: true });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, OFFICES_COL);
+    }
+  },
+
+  async saveOffice(office: TransportOffice) {
+    try {
+      await setDoc(doc(db, OFFICES_COL, office.id), office, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${OFFICES_COL}/${office.id}`);
+      throw error;
+    }
+  },
+
+  async updateSubscription(officeId: string, updates: Partial<TransportOffice>) {
+    const ref = doc(db, OFFICES_COL, officeId);
+    try {
+      await updateDoc(ref, updates);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${OFFICES_COL}/${officeId}`);
+    }
+  },
+
+  async deleteOffice(officeId: string) {
+    const ref = doc(db, OFFICES_COL, officeId);
+    try {
+      await deleteDoc(ref);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${OFFICES_COL}/${officeId}`);
     }
   }
 };

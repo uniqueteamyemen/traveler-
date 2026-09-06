@@ -7,6 +7,7 @@ export type TabType =
   | 'itinerary'      // الجدول الزمني والأنشطة
   | 'map'            // خريطة المسار اليمني
   | 'driver_portal'  // بوابة السائقين والشركات
+  | 'admin_control'  // لوحة تحكم الإدارة الشاملة وحجب المكاتب والاشتراكات
   | 'bookings'       // التذاكر والحجوزات
   | 'expenses'       // المصاريف والقطة بالريال اليمني/السعودي/الدولار
   | 'documents'      // خزينة الوثائق
@@ -38,6 +39,36 @@ export interface PlannedStop {
   notes?: string;
 }
 
+export type TripLifecycleStatus = 'open' | 'full' | 'departed' | 'arrived' | 'cancelled';
+
+export interface TripConflictNotice {
+  isConflictDetected: boolean;
+  conflictingListingId: string;
+  conflictingEntityName: string;
+  conflictingEntityType: 'individual' | 'company';
+  matchedPlateNumber: string;
+  detectedAt: string;
+  resolutionStatus: 'unresolved' | 'driver_confirmed' | 'office_confirmed' | 'synced_merged';
+  resolutionNotes?: string;
+}
+
+export interface DriverVehicle {
+  id: string;
+  ownerId?: string; // UID of the captain or vehicle owner
+  ownerName?: string;
+  ownerPhone?: string;
+  model: string;
+  plateNumber: string;
+  vehicleType: 'sedan' | 'suv_4x4' | 'vip_limousine' | 'microbus' | 'large_bus';
+  year: number;
+  totalSeats: number;
+  color?: string;
+  photoUrl?: string;
+  isPrimary?: boolean;
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface InterCityTripListing {
   id: string;
   driverName: string;
@@ -50,10 +81,23 @@ export interface InterCityTripListing {
   hasMechanicalPass: boolean;
   hasBackupCarCommitment: boolean;
   
+  // Security & Ownership
+  driverUid?: string;
+  ownerUid?: string;
+  vehicleId?: string;
+  
+  // Trip Lifecycle
+  tripStatus?: TripLifecycleStatus; // 'open' | 'full' | 'departed' | 'arrived' | 'cancelled'
+  statusUpdatedAt?: string;
+  
+  // Collision / Duplicate Plate Detection
+  conflictNotice?: TripConflictNotice;
+  
   // Company or Individual
   operatorType: 'individual' | 'company';
   companyName?: string;
   companyLogo?: string;
+  officeId?: string;
   
   // Route
   fromGovernorate: string;
@@ -89,6 +133,9 @@ export interface InterCityTripListing {
   allowsFamilyTracking: boolean;
   familyTrackingCode: string;
   notes?: string;
+  
+  // Offline SMS Metadata
+  createdViaSMS?: boolean;
 }
 
 export interface Activity {
@@ -266,23 +313,83 @@ export type NotificationType =
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
-export type UserRole = 'passenger' | 'driver' | 'transport_company' | 'family';
+export type UserRole = 
+  | 'passenger' 
+  | 'traveler'
+  | 'driver' 
+  | 'captain'
+  | 'vehicle_owner' 
+  | 'transport_company' 
+  | 'family' 
+  | 'admin'
+  | 'super_admin';
+
+export interface ParsedSMSResult {
+  success: boolean;
+  action: 'open_trip' | 'depart_trip' | 'arrive_trip' | 'mark_full' | 'road_alert' | 'unknown';
+  message: string;
+  messageAr: string;
+  createdListing?: Partial<InterCityTripListing>;
+  targetTripCode?: string;
+  roadAlertText?: string;
+}
 
 export interface UserProfile {
   uid: string;
   email?: string | null;
   displayName?: string | null;
   photoURL?: string | null;
-  phoneNumber?: string | null;
+  
+  // Strict Phone Separation (Yemeni Numbers Only)
+  phoneNumber?: string | null; // Backward compatibility
+  primaryPhone?: string;       // هاتف الاتصال الأول - إجباري
+  secondaryPhone?: string;     // هاتف الاتصال الثاني - اختياري
+  whatsappPhone?: string;      // رقم واتساب الفعلي
+  
   role: UserRole;
+  roles?: UserRole[];          // Multi-role support (e.g. ['traveler', 'captain'])
+  userType?: 'captain' | 'vehicle_owner' | 'traveler';
+  isProfileComplete?: boolean; // إكمال البيانات الأساسية قبل الدخول للداشبورد
+  
   governorate?: string;
   isDriverVerified?: boolean;
+  isPhoneVerified?: boolean;
   vehicleModel?: string;
   plateNumber?: string;
   companyName?: string;
   rating?: number;
   totalTrips?: number;
   createdAt: string;
+  
+  // Multi-vehicle garage for individual drivers & vehicle owners
+  registeredVehicles?: DriverVehicle[];
+  activeVehicleId?: string;
+
+  // Legal ID Document (Optional at onboarding, can be added anytime)
+  idDocumentType?: 'national_id' | 'passport';
+  idDocumentNumber?: string;
+}
+
+export interface AppChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'traveler' | 'captain' | 'vehicle_owner' | 'admin';
+  senderPhone?: string;
+  recipientId?: string; // 'admin' or target user
+  text: string;
+  timestamp: string;
+  isFromAdmin: boolean;
+  readByAdmin?: boolean;
+  category?: 'general_inquiry' | 'captain_question' | 'trip_booking' | 'safety_inquiry' | 'faq_suggestion';
+}
+
+export interface FAQItem {
+  id: string;
+  questionAr: string;
+  answerAr: string;
+  targetAudience: 'all' | 'captains' | 'travelers';
+  category: string;
 }
 
 export interface RoadPassAlert {
@@ -315,6 +422,7 @@ export interface AppNotification {
     | 'itinerary' 
     | 'map' 
     | 'driver_portal' 
+    | 'admin_control'
     | 'bookings' 
     | 'expenses' 
     | 'documents' 
@@ -326,3 +434,124 @@ export interface AppNotification {
   locationName?: string;
   isRead: boolean;
 }
+
+// ==================== FLEET & TRANSPORT OFFICES ====================
+export type OfficeSubscriptionTier = 'enterprise_large' | 'growth_medium' | 'starter_small' | 'free_trial';
+export type OfficeSubscriptionStatus = 'active' | 'inactive' | 'expired' | 'pending_payment' | 'suspended';
+export type OfficeCategory = 'large_company' | 'medium_office' | 'small_local_agency';
+
+export interface FleetVehicle {
+  id: string;
+  model: string;
+  type: 'sedan' | 'suv_4x4' | 'vip_limousine' | 'microbus' | 'large_bus';
+  plateNumber: string;
+  totalSeats: number;
+  photoUrl: string;
+  year: number;
+  amenities: string[];
+}
+
+export interface OfficeBranch {
+  id: string;
+  governorate: string;
+  city: string;
+  address: string;
+  phone: string;
+  whatsapp?: string;
+  workingHours?: string;
+}
+
+export interface TransportOffice {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  logo: string;
+  coverImage: string;
+  taglineAr: string;
+  taglineEn?: string;
+  aboutAr: string;
+  primaryGovernorate: string;
+  phone: string;
+  whatsapp: string;
+  email?: string;
+  rating: number;
+  reviewCount: number;
+  isVerified: boolean;
+  licenseNumber: string;
+  establishedYear: number;
+  features: string[];
+  fleetGallery: string[];
+  fleetVehicles: FleetVehicle[];
+  branches: OfficeBranch[];
+
+  // Subscriptions & Admin Controls
+  officeCategory?: OfficeCategory; // شركة كبرى / مكتب متوسط / وكالة محلية صغيرة
+  subscriptionTier?: OfficeSubscriptionTier; // الباقة (كبرى، متوسطة، صغيرة، تجريبية)
+  subscriptionStatus?: OfficeSubscriptionStatus; // حالة الاشتراك (مفعل، محجوب، منتهي، معلق، قيد السداد)
+  subscriptionStartDate?: string;
+  subscriptionExpiresAt?: string;
+  monthlyFeeYER?: number;
+  isVisibleToPublic?: boolean; // حجب أو إظهار في التطبيق والسوق
+  adminBlockReason?: string; // سبب الحجب الإداري إن وجد
+  adminNotes?: string;
+  totalBookingsProcessed?: number;
+}
+
+// ==================== AI SOCIAL MEDIA POSTS & MARKETING ====================
+export type SocialCampaignType = 'driver_recruitment' | 'passenger_recruitment' | 'trip_announcement' | 'office_showcase';
+export type SocialPlatform = 'instagram_post' | 'instagram_story' | 'facebook_feed' | 'whatsapp_broadcast' | 'twitter_x' | 'telegram_channel';
+export type SocialCopyTone = 'authentic_yemeni' | 'professional_saas' | 'action_urgent' | 'family_safety';
+
+export interface SocialPostGenerated {
+  id: string;
+  type: SocialCampaignType;
+  title: string;
+  headlineAr: string;
+  bodyTextAr: string;
+  callToActionAr: string;
+  hashtags: string[];
+  suggestedEmojis: string[];
+  fullFormattedCaption: string;
+  formattedWhatsAppMsg: string;
+  facebookPostText?: string;
+  twitterPostText?: string;
+  telegramPostText?: string;
+  visualTheme: {
+    bgGradient: string;
+    accentColor: string;
+    badgeTextAr: string;
+    cardSubheadAr: string;
+  };
+}
+
+// ==================== LIVE ENCRYPTED TRACKING & ROAD NOTICES ====================
+export type LocationSourceType = 'driver_phone' | 'passenger_phone' | 'checkpoint_sync';
+export type RoadAlertReason = 'rain_floods' | 'maintenance_detour' | 'fog_low_visibility' | 'rock_slide' | 'rest_break' | 'road_clear';
+
+export interface RoadConditionNotice {
+  id: string;
+  tripCode: string;
+  reason: RoadAlertReason;
+  titleAr: string;
+  messageAr: string;
+  cityOrPassAr: string;
+  timestamp: string;
+  isDetourActive: boolean;
+  detourRouteNameAr?: string;
+}
+
+export interface LiveTripLocation {
+  tripCode: string; // e.g. YEM-AD-MK-772
+  sourceType: LocationSourceType;
+  sourceName: string; // Name of Captain or Passenger broadcasting
+  lat: number;
+  lng: number;
+  currentCityOrPassAr: string;
+  nearestCheckpointAr?: string;
+  nextScheduledStopAr?: string;
+  lastUpdated: string;
+  isBroadcasting: boolean;
+  signalStatus: 'good_4g' | 'weak_3g' | 'offline_cached';
+  activeRoadNotice?: RoadConditionNotice;
+}
+

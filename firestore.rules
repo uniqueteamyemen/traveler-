@@ -12,36 +12,57 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // User profiles & roles (passenger, driver, transport_company, family)
+    // User profiles & roles (Traveler, Captain, Vehicle Owner, Transport Company)
     match /users/{userId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update: if isAuthenticated() ? isOwner(userId) : true;
       allow delete: if isAuthenticated() && isOwner(userId);
     }
 
-    // Intercity Trips & Vehicle Listings
+    // Vehicle Registry (Captain / Owner multi-vehicle garage)
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || !('ownerId' in resource.data));
+    }
+
+    // Intercity Trips & Vehicle Listings (Public search + Captain ownership)
     match /intercityListings/{listingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAuthenticated() ? (
+        !('driverUid' in resource.data) || 
+        resource.data.driverUid == request.auth.uid || 
+        resource.data.ownerUid == request.auth.uid
+      ) : true;
     }
 
-    // Live Bookings & Tickets
+    // Live Bookings & Passenger Tickets
     match /bookings/{bookingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
     }
 
-    // Planned Trips & Itineraries
+    // Planned Trips & Itineraries (Tracking code / Family access)
     match /trips/{tripId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if true;
     }
 
     // Real-Time Live Notifications & Broadcasts
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAuthenticated();
     }
 
     // Highway Road Status & Mountain Pass Alerts
     match /roadAlerts/{alertId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAuthenticated();
     }
   }
 }
+

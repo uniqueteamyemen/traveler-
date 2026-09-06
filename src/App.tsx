@@ -5,6 +5,7 @@ import { TripOverview } from './components/TripOverview';
 import { IntercityHub } from './components/IntercityHub';
 import { FixedPlanSafety } from './components/FixedPlanSafety';
 import { DriverPortal } from './components/DriverPortal';
+import { AdminControlPortal } from './components/AdminControlPortal';
 import { ItineraryView } from './components/ItineraryView';
 import { RouteMap } from './components/RouteMap';
 import { BookingsView } from './components/BookingsView';
@@ -22,9 +23,13 @@ import { NewStoryModal } from './components/modals/NewStoryModal';
 import { LiveNotificationToast } from './components/LiveNotificationToast';
 import { AuthControlModal } from './components/modals/AuthControlModal';
 import { RoadAlertsModal } from './components/modals/RoadAlertsModal';
+import { FamilyLiveTrackingModal } from './components/modals/FamilyLiveTrackingModal';
+import { SocialMediaAutoPosterModal } from './components/modals/SocialMediaAutoPosterModal';
+import { InAppSupportChatModal } from './components/modals/InAppSupportChatModal';
+import { MessageSquare } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { activeTab, activeTrip, lang } = useTravel();
+  const { activeTab, activeTrip, lang, setIsChatOpen, chatMessages } = useTravel();
 
   // Modals state
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
@@ -36,6 +41,8 @@ const AppContent: React.FC = () => {
   const [isNewStoryOpen, setIsNewStoryOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isRoadAlertsOpen, setIsRoadAlertsOpen] = useState(false);
+  const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
+  const [isSocialPosterOpen, setIsSocialPosterOpen] = useState(false);
 
   const handleOpenNewActivity = (dayId?: string) => {
     setSelectedDayForActivity(dayId);
@@ -50,6 +57,8 @@ const AppContent: React.FC = () => {
         onOpenNewTrip={() => setIsNewTripOpen(true)} 
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenRoadAlerts={() => setIsRoadAlertsOpen(true)}
+        onOpenLiveTracking={() => setIsLiveTrackingOpen(true)}
+        onOpenSocialPoster={() => setIsSocialPosterOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -62,6 +71,10 @@ const AppContent: React.FC = () => {
 
         {activeTab === 'driver_portal' && (
           <DriverPortal />
+        )}
+
+        {activeTab === 'admin_control' && (
+          <AdminControlPortal />
         )}
 
         {/* Other tabs with active trip */}
@@ -108,7 +121,7 @@ const AppContent: React.FC = () => {
             )}
           </>
         ) : (
-          activeTab !== 'intercity_hub' && activeTab !== 'driver_portal' && (
+          activeTab !== 'intercity_hub' && activeTab !== 'driver_portal' && activeTab !== 'admin_control' && (
             <div className="text-center py-20">
               <h2 className="text-lg font-bold text-stone-800 dark:text-stone-200">
                 {lang === 'ar' ? 'ابدأ رحلتك القادمة في اليمن' : 'Start Your Next Journey in Yemen'}
@@ -128,7 +141,7 @@ const AppContent: React.FC = () => {
       <footer className="border-t border-stone-200 dark:border-stone-800 py-6 text-center text-xs text-stone-600 dark:text-stone-300">
         <p>
           {lang === 'ar' 
-            ? 'سَفَر — شبكة النقل بين محافظات اليمن الـ 22 وخطة السير الثابتة السحابية © 2026' 
+            ? 'المسافر (Traveler) — شبكة النقل بين محافظات اليمن الـ 22 وخطة السير الثابتة السحابية © 2026' 
             : 'Traveler — 22 Yemeni Governorates Intercity Transit Network © 2026'}
         </p>
       </footer>
@@ -149,6 +162,29 @@ const AppContent: React.FC = () => {
       <NewStoryModal isOpen={isNewStoryOpen} onClose={() => setIsNewStoryOpen(false)} />
       <AuthControlModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <RoadAlertsModal isOpen={isRoadAlertsOpen} onClose={() => setIsRoadAlertsOpen(false)} />
+      <FamilyLiveTrackingModal isOpen={isLiveTrackingOpen} onClose={() => setIsLiveTrackingOpen(false)} />
+      <SocialMediaAutoPosterModal isOpen={isSocialPosterOpen} onClose={() => setIsSocialPosterOpen(false)} />
+      
+      {/* Zero Cost In-App Support Chat & Community FAQ Modal */}
+      <InAppSupportChatModal />
+
+      {/* Floating Free Chat Action Button */}
+      <button
+        id="floating-support-chat-trigger"
+        onClick={() => setIsChatOpen(true)}
+        className="fixed bottom-5 start-5 z-40 p-3 sm:px-4 sm:py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xl shadow-emerald-600/40 flex items-center gap-2 transition active:scale-95 border-2 border-white/20"
+        title={lang === 'ar' ? 'المحادثة المباشرة مع الإدارة مجاناً' : 'Direct Support Chat'}
+      >
+        <div className="relative">
+          <MessageSquare className="w-5 h-5" />
+          {chatMessages.filter(m => !m.readByAdmin && !m.isFromAdmin).length > 0 && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
+          )}
+        </div>
+        <span className="hidden sm:inline font-bold text-xs">
+          {lang === 'ar' ? 'تواصل مع الإدارة مجاناً' : 'Support Chat'}
+        </span>
+      </button>
 
     </div>
   );

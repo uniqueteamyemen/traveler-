@@ -91,7 +91,7 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose }) =
       isPlanApproved: true,
       trackingCode: `YEM-${Math.floor(1000 + Math.random() * 9000)}`,
       assignedDriver: {
-        name: 'كابتن معتمد — سَفَر',
+        name: 'كابتن معتمد — المسافر',
         phone: '+967 777 000 111',
         whatsapp: '+967 777 000 111',
         vehicleModel: 'تويوتا لاندكروزر برادو',

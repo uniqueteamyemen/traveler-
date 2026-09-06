@@ -18,7 +18,11 @@ import {
   Car,
   Users,
   AlertTriangle,
-  User
+  User,
+  Crown,
+  Lock,
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
@@ -26,9 +30,17 @@ interface HeaderProps {
   onOpenNewTrip: () => void;
   onOpenAuth?: () => void;
   onOpenRoadAlerts?: () => void;
+  onOpenLiveTracking?: () => void;
+  onOpenSocialPoster?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpenRoadAlerts }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  onOpenNewTrip, 
+  onOpenAuth, 
+  onOpenRoadAlerts,
+  onOpenLiveTracking,
+  onOpenSocialPoster
+}) => {
   const { 
     trips, 
     activeTrip, 
@@ -42,7 +54,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
     toggleTheme,
     currentUser,
     userProfile,
-    roadAlerts
+    roadAlerts,
+    setIsChatOpen,
+    chatMessages
   } = useTravel();
 
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
@@ -50,16 +64,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
   const tabs: { id: TabType; labelEn: string; labelAr: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة', icon: Compass },
     { id: 'intercity_hub', labelEn: 'Intercity Trips', labelAr: 'سوق رحلات المحافظات', icon: Car, badge: '22 محافظة' },
+    { id: 'driver_portal', labelEn: 'Captains & Car Owners', labelAr: 'بوابة الكباتن وملاك السيارات 🚗', icon: Users },
     { id: 'fixed_plan', labelEn: 'Fixed Plan & Safety', labelAr: 'خطة السير وأمان العائلة', icon: ShieldCheck },
     { id: 'map', labelEn: 'Yemen Map', labelAr: 'خريطة اليمن والمسار', icon: MapPin },
     { id: 'itinerary', labelEn: 'Itinerary', labelAr: 'الجدول الزمني', icon: Calendar },
     { id: 'bookings', labelEn: 'Bookings', labelAr: 'الحجوزات والتذاكر', icon: Ticket },
-    { id: 'driver_portal', labelEn: 'Driver & Fleet Portal', labelAr: 'بوابة السائقين والشركات', icon: Users },
+    { id: 'admin_control', labelEn: 'Admin Control', labelAr: 'لوحة الإدارة والاشتراكات', icon: Crown, badge: 'Super Admin' },
     { id: 'expenses', labelEn: 'Budget & Split', labelAr: 'المصاريف والقطة', icon: DollarSign },
     { id: 'documents', labelEn: 'Documents', labelAr: 'خزينة الوثائق', icon: FileText },
     { id: 'packing', labelEn: 'Packing List', labelAr: 'حقيبة السفر', icon: Luggage },
     { id: 'stories', labelEn: 'Beginning of Story', labelAr: 'بداية القصة', icon: BookOpen },
   ];
+
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.roles?.includes('admin');
+  const visibleTabs = tabs.filter(tab => tab.id !== 'admin_control' || isAdmin);
 
   return (
     <header className="sticky top-0 z-40 bg-stone-50/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 transition-colors shadow-xs">
@@ -75,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-base sm:text-lg font-black tracking-tight text-stone-900 dark:text-white leading-tight">
-                    {lang === 'ar' ? 'سَفَر' : 'TRAVELER'}
+                    {lang === 'ar' ? 'المسافر' : 'TRAVELER'}
                   </h1>
                   <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300/40 dark:border-amber-700/40">
                     {lang === 'ar' ? 'اليمن 🇾🇪' : 'Yemen'}
@@ -123,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
                       }`}
                     >
                       <span className="truncate">{lang === 'ar' ? (trip.titleAr || trip.title) : trip.title}</span>
-                      <span className="text-[10px] text-amber-700 dark:text-amber-400 shrink-0 ms-2">{trip.originGovernorate ? `${trip.originGovernorate} ➔ ${trip.destinationGovernorate}` : trip.destination}</span>
+                      <span className="text-[10px] text-amber-700 dark:text-amber-400 shrink-0 ms-2">{trip.originGovernorate ? `${trip.originGovernorate} ${lang === 'ar' ? '←' : '➔'} ${trip.destinationGovernorate}` : trip.destination}</span>
                     </button>
                   ))}
                   <div className="border-t border-stone-100 dark:border-stone-700 mt-1 pt-1">
@@ -146,6 +164,30 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
+            {/* Social Media Automator Button */}
+            {onOpenSocialPoster && (
+              <button
+                onClick={onOpenSocialPoster}
+                title={lang === 'ar' ? 'وحدة إنشاء المنشورات الدعائية المجانية' : 'Social Media Automator'}
+                className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition text-xs font-bold flex items-center gap-1.5 shadow-xs"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                <span className="hidden xl:inline text-[11px] font-black">{lang === 'ar' ? 'نشر دعائي 🎁' : 'Auto-Poster 🎁'}</span>
+              </button>
+            )}
+
+            {/* Encrypted Family Live Tracking Button */}
+            {onOpenLiveTracking && (
+              <button
+                onClick={onOpenLiveTracking}
+                title={lang === 'ar' ? 'تتبع رحلة عائلتك بالكود المشفر' : 'Encrypted Family Live Tracking'}
+                className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-stone-900 dark:bg-stone-800 text-amber-300 hover:bg-stone-800 border border-stone-700 shadow-xs transition text-xs font-bold flex items-center gap-1.5"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden md:inline text-[11px] font-mono">{lang === 'ar' ? 'تتبع بالكود 🔒' : 'Live Track 🔒'}</span>
+              </button>
+            )}
+
             {/* Road Passes & Mountain Radar Button */}
             {onOpenRoadAlerts && (
               <button
@@ -157,6 +199,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
                 <span className="hidden lg:inline text-[11px] font-extrabold">{lang === 'ar' ? 'رادار الطرق' : 'Radar'}</span>
               </button>
             )}
+
+            {/* Free In-App Support Chat & FAQ Button */}
+            <button
+              onClick={() => setIsChatOpen(true)}
+              title={lang === 'ar' ? 'المحادثة المباشرة مع الإدارة والأسئلة الشائعة مجاناً' : 'Free Live Support & FAQ'}
+              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition text-xs font-bold flex items-center gap-1.5 shadow-xs relative"
+            >
+              <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden lg:inline text-[11px] font-extrabold">{lang === 'ar' ? 'محادثة ودعم' : 'Support'}</span>
+              {chatMessages.filter(m => !m.readByAdmin && !m.isFromAdmin).length > 0 && (
+                <span className="absolute -top-1 -end-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+              )}
+            </button>
 
             {/* Real-time Notification Bell */}
             <NotificationBell />
@@ -214,7 +269,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNewTrip, onOpenAuth, onOpe
 
         {/* Navigation Tabs Bar */}
         <nav className="flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar scroll-smooth">
-          {tabs.map(tab => {
+          {visibleTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (

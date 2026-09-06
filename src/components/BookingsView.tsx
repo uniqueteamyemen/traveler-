@@ -127,7 +127,7 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ onOpenNewBooking }) 
                 <div className="flex items-center gap-2">
                   <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                   <span>
-                    {booking.startDate} {booking.endDate ? `→ ${booking.endDate}` : ''}
+                    {booking.startDate} {booking.endDate ? `${lang === 'ar' ? '←' : '→'} ${booking.endDate}` : ''}
                   </span>
                   {booking.startTime && (
                     <span className="text-stone-400 font-mono">
@@ -139,7 +139,7 @@ export const BookingsView: React.FC<BookingsViewProps> = ({ onOpenNewBooking }) 
                 {(booking.departureLocation || booking.arrivalLocation) && (
                   <div className="flex items-center gap-2">
                     <Plane className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                    <span>{booking.departureLocation} → {booking.arrivalLocation}</span>
+                    <span>{booking.departureLocation} {lang === 'ar' ? '←' : '→'} {booking.arrivalLocation}</span>
                   </div>
                 )}
 

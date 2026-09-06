@@ -6,7 +6,7 @@ export const INITIAL_TRIPS: Trip[] = [
     title: 'Aden to Hadhramaut Grand Expedition & Shibam Heritage',
     titleAr: 'رحلة سحر اليمن الكبرى: من عروس البحر عدن إلى لؤلؤة حضرموت شبام وسحر دوعن',
     destination: 'المكلا، شبام حضرموت، وادي دوعن وحيد الجزيل',
-    origin: 'عدن (كريتر / الشيخ عثمان) ➔ خط أبين وشبوة الساحلي',
+    origin: 'عدن (كريتر / الشيخ عثمان) ← خط أبين وشبوة الساحلي',
     country: 'اليمن',
     originGovernorate: 'عدن',
     destinationGovernorate: 'حضرموت',
@@ -391,7 +391,7 @@ export const INITIAL_TRIPS: Trip[] = [
             time: '16:00',
             title: 'Arrival in Aden & Trip Completion',
             titleAr: 'الوصول بسلامة الله إلى عدن واكتمال الرحلة بنجاح',
-            description: 'الوصول إلى المنازل بسلام وتوثيق تقييم الكابتن والخدمة في تطبيق سَفَر.',
+            description: 'الوصول إلى المنازل بسلام وتوثيق تقييم الكابتن والخدمة في تطبيق المسافر.',
             location: 'Aden City Center',
             category: 'relaxation',
             cost: 0,
@@ -405,8 +405,8 @@ export const INITIAL_TRIPS: Trip[] = [
       {
         id: 'bk-y1',
         type: 'intercity_car',
-        provider: 'كابتن أبو بكر القريشي (سيارة برادو معتمدة - تطبيق سَفَر)',
-        title: 'رحلة نقل كبار الشخصيات بين المحافظات: عدن ➔ المكلا ➔ وادي دوعن',
+        provider: 'كابتن أبو بكر القريشي (سيارة برادو معتمدة - تطبيق المسافر)',
+        title: 'رحلة نقل كبار الشخصيات بين المحافظات: عدن ← المكلا ← وادي دوعن',
         referenceNumber: 'YEM-TRIP-9921',
         startDate: '2026-09-05',
         startTime: '06:30',
@@ -456,7 +456,7 @@ export const INITIAL_TRIPS: Trip[] = [
     expenses: [
       {
         id: 'exp-y1',
-        title: 'حجز مقاعد سيارة النقل المعتمدة (عدن ➔ المكلا)',
+        title: 'حجز مقاعد سيارة النقل المعتمدة (عدن ← المكلا)',
         amount: 90000,
         currency: 'YER',
         category: 'transport',
@@ -521,13 +521,13 @@ export const INITIAL_TRIPS: Trip[] = [
     documents: [
       {
         id: 'doc-y1',
-        title: 'البطاقة الشخصية الذكية (الهوية الوطنية اليمنية)',
+        title: 'البطاقة الشخصية أو جواز السفر (الهوية الوطنية اليمنية)',
         type: 'id_card',
         holderName: 'أبو بكر عبد الرحمن القريشي',
         documentNumber: '02-88192019',
         expiryDate: '2029-08-14',
         issuingAuthority: 'مصلحة الأحوال المدنية والسجل المدني — عدن',
-        notes: 'أصل البطاقة جاهز للنقاط الأمنية'
+        notes: 'أصل البطاقة أو جواز السفر جاهز للنقاط الأمنية'
       },
       {
         id: 'doc-y2',
@@ -535,7 +535,7 @@ export const INITIAL_TRIPS: Trip[] = [
         type: 'travel_permit',
         holderName: 'أبو بكر عبد الرحمن القريشي',
         documentNumber: 'YEM-PERM-8821',
-        notes: 'يشمل رمز التتبع الحي للأمان العائلي وضمان السيارة البديلة من منصة سَفَر'
+        notes: 'يشمل رمز التتبع الحي للأمان العائلي وضمان السيارة البديلة من منصة المسافر'
       },
       {
         id: 'doc-y3',
@@ -709,7 +709,7 @@ export const INITIAL_TRIPS: Trip[] = [
     endDate: '2026-10-17',
     budget: 1200,
     currency: 'USD',
-    travelers: ['أبو بكر', 'فريق سَفَر الاستكشافي'],
+    travelers: ['أبو بكر', 'فريق المسافر الاستكشافي'],
     description: 'استكشاف الطبيعة العذراء الفريدة في كوكب الأرض: غابات شجرة دم الأخوين بهضبة دكسم، والشواطئ الفيروزية الرملية البيضاء وكهوف سقطرى الساحرة.',
     coordinates: {
       lat: 12.4634,
@@ -730,7 +730,7 @@ export const INITIAL_TRIPS: Trip[] = [
     title: 'The Ancient Incense Route: Marib & Sabaean Kingdom',
     titleAr: 'طريق البخور ومهد الحضارات: مأرب، عرش بلقيس، سد مأرب العظيم، وشبوة التاريخية',
     destination: 'مأرب (عرش بلقيس، معبد أوام، سد مأرب التاريخي)',
-    origin: 'صنعاء / شبوة ➔ خط العبر ومأرب',
+    origin: 'صنعاء / شبوة ← خط العبر ومأرب',
     country: 'اليمن',
     originGovernorate: 'مأرب',
     destinationGovernorate: 'مأرب',

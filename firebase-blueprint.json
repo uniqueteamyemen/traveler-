@@ -10,7 +10,11 @@
         "displayName": { "type": "string", "description": "Full display name" },
         "photoURL": { "type": "string", "description": "Avatar photo URL" },
         "phoneNumber": { "type": "string", "description": "Phone or WhatsApp number" },
-        "role": { "type": "string", "enum": ["passenger", "driver", "transport_company", "family"], "description": "User role in the app" },
+        "primaryPhone": { "type": "string", "description": "Primary call phone (Yemeni format)" },
+        "secondaryPhone": { "type": "string", "description": "Secondary optional call phone" },
+        "whatsappPhone": { "type": "string", "description": "Dedicated WhatsApp phone" },
+        "role": { "type": "string", "enum": ["passenger", "traveler", "driver", "captain", "vehicle_owner", "transport_company", "family", "super_admin"], "description": "User role in the app" },
+        "isProfileComplete": { "type": "boolean", "description": "Whether captain/owner completed initial profile and first vehicle" },
         "governorate": { "type": "string", "description": "Governorate of residence" },
         "isDriverVerified": { "type": "boolean", "description": "Whether the driver is verified" },
         "createdAt": { "type": "string", "description": "Account creation timestamp" }

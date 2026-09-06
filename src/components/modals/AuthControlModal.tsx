@@ -91,7 +91,7 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 {lang === 'ar' ? 'بوابة الحسابات والمصادقة المركزية' : 'Traveler Central Cloud Auth'}
               </h3>
               <p className="text-xs text-amber-100">
-                {lang === 'ar' ? 'سحابة سَفَر لمزامنة السائقين، الركاب، والأهل' : 'Real-time multi-user synchronization'}
+                {lang === 'ar' ? 'سحابة المسافر (Traveler) لمزامنة السائقين، الركاب، والأهل' : 'Real-time multi-user synchronization'}
               </p>
             </div>
           </div>

@@ -16,17 +16,29 @@ import {
   UserProfile,
   UserRole,
   RoadPassAlert,
-  TabType
+  TabType,
+  TransportOffice,
+  FleetVehicle,
+  DriverVehicle,
+  TripLifecycleStatus,
+  TripConflictNotice,
+  AppChatMessage,
+  FAQItem
 } from '../types/travel';
 import { loadTrips, saveTrips, getSavedActiveTripId, saveActiveTripId, getSavedLanguage, saveLanguage, getSavedTheme, saveTheme } from '../utils/storage';
 import { INITIAL_INTERCITY_TRIPS } from '../data/yemenData';
+import { INITIAL_TRANSPORT_OFFICES } from '../data/transportOfficesData';
 import { playNotificationChime } from '../utils/audioChime';
+import { checkPlateCollision } from '../services/tripConflictService';
+import { parseIncomingSMS, ParsedSMSResult } from '../services/smsTripService';
 import { 
   authService, 
   listingsService, 
+  transportOfficesService,
   tripsService, 
   notificationsService, 
   roadPassesService,
+  vehiclesService,
   INITIAL_ROAD_PASSES 
 } from '../services/firebaseService';
 import { FirebaseUser } from '../lib/firebase';
@@ -74,10 +86,59 @@ interface TravelContextType {
   dismissLiveToast: () => void;
   triggerTestNotification: (type?: NotificationType) => void;
   
-  // Intercity Listings
+  // Intercity Listings & Lifecycle
   intercityListings: InterCityTripListing[];
   addIntercityListing: (listing: Omit<InterCityTripListing, 'id'>) => void;
   bookIntercityListing: (listing: InterCityTripListing, seatsCount: number, isFullCar: boolean, passengerName: string, passengerPhone: string) => void;
+  updateTripLifecycleStatus: (listingId: string, status: TripLifecycleStatus) => void;
+  resolveTripConflict: (listingId: string, resolution: 'driver_confirmed' | 'office_confirmed' | 'synced_merged', notes?: string) => void;
+  
+  // Driver Garage & One-Time Verification (Free Individual Drivers)
+  driverVehicles: DriverVehicle[];
+  activeDriverVehicleId: string;
+  setActiveDriverVehicleId: (id: string) => void;
+  addDriverVehicle: (vehicle: Omit<DriverVehicle, 'id'>) => void;
+  removeDriverVehicle: (vehicleId: string) => void;
+  isDriverPhoneVerified: boolean;
+  verifyDriverPhone: (phone: string, code?: string) => boolean;
+  completeCaptainProfile: (
+    profileData: {
+      displayName: string;
+      role: 'captain' | 'vehicle_owner' | 'driver';
+      primaryPhone: string;
+      secondaryPhone?: string;
+      whatsappPhone: string;
+      governorate?: string;
+      idDocumentType?: 'national_id' | 'passport';
+      idDocumentNumber?: string;
+    },
+    firstVehicle: Omit<DriverVehicle, 'id' | 'ownerId'>
+  ) => Promise<void>;
+  updateContactPhones: (primaryPhone: string, secondaryPhone: string, whatsappPhone: string) => Promise<void>;
+  
+  // In-App Support Chat & Community FAQ (Zero cost for users)
+  chatMessages: AppChatMessage[];
+  sendChatMessage: (text: string, category?: AppChatMessage['category']) => void;
+  adminReplyChatMessage: (messageId: string, replyText: string) => void;
+  faqs: FAQItem[];
+  addFaqItem: (item: Omit<FAQItem, 'id'>) => void;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
+
+  // Offline SMS Trip Processing
+  processDriverSMS: (smsText: string, senderPhone?: string) => ParsedSMSResult;
+  
+  // Transport Offices & Fleets & Admin Subscriptions
+  transportOffices: TransportOffice[];
+  addTransportOffice: (office: Omit<TransportOffice, 'id'>) => void;
+  updateTransportOffice: (office: TransportOffice) => void;
+  deleteTransportOffice: (officeId: string) => void;
+  toggleOfficeVisibility: (officeId: string, isVisible: boolean, blockReason?: string) => void;
+  updateOfficeSubscription: (officeId: string, updates: Partial<TransportOffice>) => void;
+  addFleetVehicleToOffice: (officeId: string, vehicle: Omit<FleetVehicle, 'id'>) => void;
+  deleteIntercityListing: (listingId: string) => void;
+  toggleListingVerification: (listingId: string, isVerified: boolean) => void;
+  adminSetFamilyTracking: (listingId: string, allowsTracking: boolean, customCode?: string) => void;
   
   // Trip management
   addTrip: (trip: Trip) => void;
@@ -129,7 +190,7 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'Transit Departure in 35 Minutes',
     titleAr: 'تنبيه موعد الانطلاق: رحلة النقل البري بعد 35 دقيقة',
     message: 'Toyota Land Cruiser Prado to Hadhramaut is preparing for boarding at Sheikh Othman Station.',
-    messageAr: 'مركبة تويوتا لاندكروزر برادو (خط عدن ➔ حضرموت) تستعد لاستقبال الركاب عند فرزة الشيخ عثمان. يرجى التواجد لتفقد الأمتعة.',
+    messageAr: 'مركبة تويوتا لاندكروزر برادو (خط عدن ← حضرموت) تستعد لاستقبال الركاب عند فرزة الشيخ عثمان. يرجى التواجد لتفقد الأمتعة.',
     type: 'transit_departure',
     priority: 'urgent',
     timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
@@ -178,6 +239,92 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     timestamp: new Date(Date.now() - 120 * 60000).toISOString(),
     targetTab: 'fixed_plan',
     isRead: true
+  }
+];
+
+const CHAT_MESSAGES_KEY = 'safar_app_chat_messages_v1';
+const FAQS_KEY = 'safar_app_faqs_v1';
+
+const INITIAL_FAQS: FAQItem[] = [
+  {
+    id: 'faq-1',
+    questionAr: 'هل التسجيل مجاني في تطبيق المسافر (Traveler)؟',
+    answerAr: 'نعم، التسجيل مجاني 100% لجميع الكباتن وملاك السيارات والركاب. يمكنك تسجيل بياناتك وسيارتك الأولى والبدء مباشرة دون أي رسوم اشتراك.',
+    targetAudience: 'all',
+    category: 'التسجيل والحسابات'
+  },
+  {
+    id: 'faq-2',
+    questionAr: 'ما هي الوثائق المطلوبة لتسجيل الكابتن أو مالك السيارة؟',
+    answerAr: 'يقبل التطبيق قانونياً البطاقة الشخصية أو جواز السفر اليمني. كما نتيح لك خيار التسجيل المبدئي وإضافة وثيقة الهوية لاحقاً في أي وقت يناسبك دون تعقيد.',
+    targetAudience: 'captains',
+    category: 'التوثيق والهوية'
+  },
+  {
+    id: 'faq-3',
+    questionAr: 'كيف تضمن المنصة ترويج رحلات الكابتن وجلب الركاب له؟',
+    answerAr: 'تقوم إدارة منصة المسافر (Traveler) بترويج ونشر كافة الرحلات المجدولة عبر صفحات وحسابات المنصة على إنستغرام وفيسبوك، بالإضافة إلى نشرها في مجموعات السفر النشطة على واتساب وتيليجرام بين المحافظات لضمان حجز المقاعد.',
+    targetAudience: 'captains',
+    category: 'نشر الرحلات والترويج'
+  },
+  {
+    id: 'faq-4',
+    questionAr: 'ليس لدي رصيد هاتف، كيف أتواصل مع الإدارة أو الدعم؟',
+    answerAr: 'نوفر لك في تطبيق المسافر خاصية «المحادثة المباشرة المجانية عبر التطبيق». يمكنك إرسال استفسارك أو طلبك وستصل رسالتك مباشرة للآدمن ويجيبك مجاناً دون الحاجة لرصيد مكالمات أو رسائل SMS.',
+    targetAudience: 'all',
+    category: 'الدعم والمحادثات'
+  },
+  {
+    id: 'faq-5',
+    questionAr: 'كيف يتم تفعيل كود التتبع والأمان العائلي للرحلة؟',
+    answerAr: 'كود التتبع العائلي يخضع لإشراف ومصادقة حصرية من إدارة المنصة (الآدمن) لضمان أمان المسافرين والعائلات، وتزود العائلة برابط متابعة مباشر لمسار الرحلة.',
+    targetAudience: 'travelers',
+    category: 'الأمان والتتبع'
+  },
+  {
+    id: 'faq-6',
+    questionAr: 'هل سيتوفر تطبيق المسافر على متاجر Google Play و App Store؟',
+    answerAr: 'يعمل تطبيق المسافر حالياً كتطبيق ويب تقدمي خفيف (PWA) يعمل فوراً على أي متصفح هاتف دون استهلاك ذاكرة، وسيتم إطلاق نسختي المتاجر الرسمية (Android و iOS) فور استكمال مرحلة جمع البيانات والتجربة.',
+    targetAudience: 'all',
+    category: 'تطبيقات الجوال'
+  }
+];
+
+const INITIAL_CHAT_MESSAGES: AppChatMessage[] = [
+  {
+    id: 'chat-1',
+    senderId: 'driver-101',
+    senderName: 'الكابتن عبدالملك الحبيشي',
+    senderRole: 'captain',
+    senderPhone: '777412589',
+    text: 'السلام عليكم يا إدارة، هل بالإمكان الترويج لرحلتي غداً صباحاً من صنعاء إلى عدن عبر الإنستغرام وجروبات الواتساب؟',
+    timestamp: new Date(Date.now() - 3600000 * 4).toISOString(),
+    isFromAdmin: false,
+    category: 'captain_question',
+    readByAdmin: true
+  },
+  {
+    id: 'chat-2',
+    senderId: 'admin',
+    senderName: 'إدارة منصة المسافر (Traveler)',
+    senderRole: 'admin',
+    recipientId: 'driver-101',
+    text: 'وعليكم السلام ورحمة الله كابتن عبدالملك. تم إدراج رحلتك بالفعل في النشرة اليومية على حساب إنستغرام وفيسبوك ومجموعات المسافرين. نرجو لك رحلة آمنة وموفقة!',
+    timestamp: new Date(Date.now() - 3600000 * 3).toISOString(),
+    isFromAdmin: true,
+    category: 'captain_question'
+  },
+  {
+    id: 'chat-3',
+    senderId: 'passenger-202',
+    senderName: 'أم ريان الحضرمي',
+    senderRole: 'traveler',
+    senderPhone: '733984120',
+    text: 'مرحبا، أبحث عن حجز سيارة عائلية كاملة VIP من المكلا إلى عدن مع كود تتبع عائلي معتمد، هل الخدمة متوفرة؟',
+    timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
+    isFromAdmin: false,
+    category: 'trip_booking',
+    readByAdmin: false
   }
 ];
 
@@ -233,6 +380,141 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return INITIAL_INTERCITY_TRIPS;
   });
 
+  const TRANSPORT_OFFICES_KEY = 'traveler_app_offices_v1';
+  const DRIVER_VEHICLES_KEY = 'traveler_app_driver_vehicles_v1';
+  const DRIVER_PHONE_VERIFIED_KEY = 'traveler_app_driver_verified_phone_v1';
+
+  const INITIAL_DRIVER_GARAGE: DriverVehicle[] = [
+    {
+      id: 'dveh-1',
+      model: 'تويوتا لاندكروزر صالون GXR V8',
+      plateNumber: '12455 / صنعاء',
+      vehicleType: 'suv_4x4',
+      year: 2024,
+      totalSeats: 4,
+      color: 'أبيض لؤلؤي',
+      isPrimary: true
+    },
+    {
+      id: 'dveh-2',
+      model: 'هيونداي ستاريا VIP H1',
+      plateNumber: '88721 / عدن',
+      vehicleType: 'microbus',
+      year: 2023,
+      totalSeats: 7,
+      color: 'فضي ملكي',
+      isPrimary: false
+    }
+  ];
+
+  const [driverVehicles, setDriverVehicles] = useState<DriverVehicle[]>(() => {
+    try {
+      const saved = localStorage.getItem(DRIVER_VEHICLES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_DRIVER_GARAGE;
+  });
+
+  const [activeDriverVehicleId, setActiveDriverVehicleId] = useState<string>(() => {
+    return driverVehicles[0]?.id || 'dveh-1';
+  });
+
+  const [isDriverPhoneVerified, setIsDriverPhoneVerified] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(DRIVER_PHONE_VERIFIED_KEY);
+      return saved === 'true';
+    } catch {
+      return true; // Default true so new drivers can test immediately
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRIVER_VEHICLES_KEY, JSON.stringify(driverVehicles));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [driverVehicles]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRIVER_PHONE_VERIFIED_KEY, String(isDriverPhoneVerified));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isDriverPhoneVerified]);
+
+  const [transportOffices, setTransportOffices] = useState<TransportOffice[]>(() => {
+    try {
+      const saved = localStorage.getItem(TRANSPORT_OFFICES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_TRANSPORT_OFFICES;
+  });
+
+  // In-App Support Chat & Community FAQ State (Zero cost for users)
+  const [chatMessages, setChatMessages] = useState<AppChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_MESSAGES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load chat messages:', e);
+    }
+    return INITIAL_CHAT_MESSAGES;
+  });
+
+  const [faqs, setFaqs] = useState<FAQItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(FAQS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load faqs:', e);
+    }
+    return INITIAL_FAQS;
+  });
+
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(chatMessages));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAQS_KEY, JSON.stringify(faqs));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [faqs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TRANSPORT_OFFICES_KEY, JSON.stringify(transportOffices));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [transportOffices]);
+
   const isRTL = lang === 'ar';
 
   // 1. Firebase Auth Listener
@@ -276,11 +558,18 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     });
 
+    const unsubOffices = transportOfficesService.subscribeToOffices((cloudOffices) => {
+      if (cloudOffices.length > 0) {
+        setTransportOffices(cloudOffices);
+      }
+    });
+
     return () => {
       unsubListings();
       unsubTrips();
       unsubNotifs();
       unsubRoadAlerts();
+      unsubOffices();
     };
   }, []);
 
@@ -326,6 +615,34 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
     saveTheme(theme);
   }, [theme]);
+
+  // Hash & URL Query Navigation Listener for direct link to Captain & Vehicle Owner portal (#driver, #captain, #owner, ?tab=driver_portal, ?captain=1)
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const isCaptainParam = 
+        params.get('tab') === 'driver_portal' || 
+        params.get('portal') === 'driver' || 
+        params.get('portal') === 'captain' ||
+        params.has('captain') || 
+        params.has('driver') ||
+        search.includes('captain') ||
+        search.includes('driver');
+
+      if (hash === '#driver' || hash === '#captain' || hash === '#portal' || hash === '#owner' || isCaptainParam) {
+        setActiveTab('driver_portal');
+      }
+    };
+    handleUrlRoute();
+    window.addEventListener('hashchange', handleUrlRoute);
+    window.addEventListener('popstate', handleUrlRoute);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlRoute);
+      window.removeEventListener('popstate', handleUrlRoute);
+    };
+  }, []);
 
   // Auth Action Methods
   const loginWithGoogle = async () => {
@@ -566,13 +883,419 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }));
   };
 
+  const addDriverVehicle = (vehicleData: Omit<DriverVehicle, 'id'>) => {
+    const uid = currentUser?.uid || userProfile?.uid || 'driver-user';
+    const newVehicle: DriverVehicle = {
+      ...vehicleData,
+      id: `dveh-${Date.now()}`,
+      ownerId: vehicleData.ownerId || uid,
+      ownerName: vehicleData.ownerName || userProfile?.displayName || 'كابتن',
+      ownerPhone: vehicleData.ownerPhone || userProfile?.primaryPhone || userProfile?.phoneNumber || '',
+      createdAt: new Date().toISOString()
+    };
+    setDriverVehicles(prev => [newVehicle, ...prev]);
+    setActiveDriverVehicleId(newVehicle.id);
+    vehiclesService.saveVehicle(newVehicle).catch(console.warn);
+
+    addNotification({
+      title: 'Vehicle Added to Garage',
+      titleAr: 'تمت إضافة السيارة لكراج المركبات بنجاح 🚗',
+      message: `${newVehicle.model} (Plate: ${newVehicle.plateNumber}) added to your active vehicles.`,
+      messageAr: `تم تسجيل ${newVehicle.model} (لوحة: ${newVehicle.plateNumber}) في كراجك لتحديدها بنقرة واحدة عند فتح أي رحلة.`,
+      type: 'general',
+      priority: 'low',
+      targetTab: 'driver_portal'
+    });
+  };
+
+  const removeDriverVehicle = (vehicleId: string) => {
+    setDriverVehicles(prev => prev.filter(v => v.id !== vehicleId));
+    vehiclesService.deleteVehicle(vehicleId).catch(console.warn);
+  };
+
+  const completeCaptainProfile = async (
+    profileData: {
+      displayName: string;
+      role: 'captain' | 'vehicle_owner' | 'driver';
+      primaryPhone: string;
+      secondaryPhone?: string;
+      whatsappPhone: string;
+      governorate?: string;
+      idDocumentType?: 'national_id' | 'passport';
+      idDocumentNumber?: string;
+    },
+    firstVehicle: Omit<DriverVehicle, 'id' | 'ownerId'>
+  ) => {
+    const uid = currentUser?.uid || userProfile?.uid || `user-${Date.now()}`;
+    const newVehicle: DriverVehicle = {
+      ...firstVehicle,
+      id: `dveh-${Date.now()}`,
+      ownerId: uid,
+      ownerName: profileData.displayName,
+      ownerPhone: profileData.primaryPhone,
+      isPrimary: true,
+      createdAt: new Date().toISOString()
+    };
+
+    setDriverVehicles(prev => [newVehicle, ...prev.filter(v => v.id !== newVehicle.id)]);
+    setActiveDriverVehicleId(newVehicle.id);
+    vehiclesService.saveVehicle(newVehicle).catch(console.warn);
+
+    const updatedProfile: UserProfile = {
+      ...(userProfile || { uid, createdAt: new Date().toISOString() }),
+      uid,
+      displayName: profileData.displayName,
+      primaryPhone: profileData.primaryPhone,
+      secondaryPhone: profileData.secondaryPhone || '',
+      whatsappPhone: profileData.whatsappPhone,
+      phoneNumber: profileData.primaryPhone,
+      role: profileData.role === 'vehicle_owner' ? 'vehicle_owner' : 'driver',
+      roles: ['traveler', profileData.role === 'vehicle_owner' ? 'vehicle_owner' : 'driver'],
+      userType: profileData.role === 'vehicle_owner' ? 'vehicle_owner' : 'captain',
+      isProfileComplete: true,
+      isPhoneVerified: true,
+      isDriverVerified: true,
+      idDocumentType: profileData.idDocumentType,
+      idDocumentNumber: profileData.idDocumentNumber,
+      governorate: profileData.governorate || 'عدن',
+      registeredVehicles: [newVehicle],
+      activeVehicleId: newVehicle.id,
+      createdAt: userProfile?.createdAt || new Date().toISOString()
+    };
+
+    setUserProfile(updatedProfile);
+    setIsDriverPhoneVerified(true);
+    if (currentUser) {
+      authService.completeUserProfile(currentUser.uid, updatedProfile).catch(console.warn);
+    }
+
+    addNotification({
+      title: 'Captain Account Ready',
+      titleAr: 'مرحباً بك في شبكة المسافر للكباتن والملاك 🇾🇪',
+      message: `Account activated for ${profileData.displayName}. First vehicle registered!`,
+      messageAr: `تم توثيق بياناتك بنجاح وتسجيل مركبتك الأولى (${newVehicle.model} - ${newVehicle.plateNumber}). يمكنك الآن فتح رحلاتك وتنسيق الركاب مباشرة.`,
+      type: 'general',
+      priority: 'high',
+      targetTab: 'driver_portal'
+    });
+  };
+
+  // In-App Chat Functions (Free Communication)
+  const sendChatMessage = (text: string, category: AppChatMessage['category'] = 'general_inquiry') => {
+    if (!text.trim()) return;
+    const isSenderAdmin = userProfile?.role === 'admin' || 
+      currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' || 
+      currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
+
+    const newMsg: AppChatMessage = {
+      id: `chat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderId: currentUser?.uid || userProfile?.uid || `guest-${Date.now()}`,
+      senderName: userProfile?.displayName || (isSenderAdmin ? 'إدارة المسافر' : 'مستخدم المسافر'),
+      senderRole: isSenderAdmin ? 'admin' : (userProfile?.role === 'vehicle_owner' ? 'vehicle_owner' : userProfile?.role === 'driver' ? 'captain' : 'traveler'),
+      senderPhone: userProfile?.primaryPhone || userProfile?.phoneNumber || '',
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+      isFromAdmin: isSenderAdmin,
+      category,
+      readByAdmin: isSenderAdmin
+    };
+
+    setChatMessages(prev => [newMsg, ...prev]);
+
+    addNotification({
+      title: 'Support Message Sent',
+      titleAr: 'تم إرسال استفسارك للإدارة بنجاح 💬',
+      message: 'Your inquiry has been sent to Traveler admin. Response will appear directly here without call charges.',
+      messageAr: 'تم تسليم استفسارك لإدارة المسافر (Traveler) بنجاح دون أي تكلفة اتصال. ستتلقى الإجابة والمتابعة مباشرة هنا.',
+      type: 'general',
+      priority: 'low',
+      targetTab: 'overview'
+    });
+  };
+
+  const adminReplyChatMessage = (targetMessageId: string, replyText: string) => {
+    if (!replyText.trim()) return;
+    const targetMsg = chatMessages.find(m => m.id === targetMessageId);
+    const reply: AppChatMessage = {
+      id: `chat-reply-${Date.now()}`,
+      senderId: 'admin',
+      senderName: 'إدارة منصة المسافر (Traveler)',
+      senderRole: 'admin',
+      recipientId: targetMsg?.senderId,
+      text: replyText.trim(),
+      timestamp: new Date().toISOString(),
+      isFromAdmin: true,
+      category: targetMsg?.category || 'general_inquiry',
+      readByAdmin: true
+    };
+
+    setChatMessages(prev => [
+      reply,
+      ...prev.map(m => m.id === targetMessageId ? { ...m, readByAdmin: true } : m)
+    ]);
+
+    addNotification({
+      title: 'Support Reply Dispatched',
+      titleAr: 'تم إرسال رد الإدارة إلى الطرف المعني ✉️',
+      message: `Reply delivered to ${targetMsg?.senderName || 'user'}.`,
+      messageAr: `تم إرسال رد الدعم إلى ${targetMsg?.senderName || 'المستخدم'} مباشرة داخل التطبيق.`,
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const addFaqItem = (item: Omit<FAQItem, 'id'>) => {
+    const newFaq: FAQItem = {
+      ...item,
+      id: `faq-${Date.now()}`
+    };
+    setFaqs(prev => [newFaq, ...prev]);
+    addNotification({
+      title: 'FAQ Added',
+      titleAr: 'تم توثيق السؤال في الأسئلة الشائعة 💡',
+      message: item.questionAr,
+      messageAr: `تمت إضافة السؤال "${item.questionAr}" بنجاح إلى قسم الأسئلة الشائعة المعتمدة.`,
+      type: 'general',
+      priority: 'low',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const updateContactPhones = async (primaryPhone: string, secondaryPhone: string, whatsappPhone: string) => {
+    if (!userProfile) return;
+    const updated: UserProfile = {
+      ...userProfile,
+      primaryPhone,
+      secondaryPhone,
+      whatsappPhone,
+      phoneNumber: primaryPhone
+    };
+    setUserProfile(updated);
+    if (currentUser) {
+      authService.updateUserProfile(currentUser.uid, {
+        primaryPhone,
+        secondaryPhone,
+        whatsappPhone,
+        phoneNumber: primaryPhone
+      }).catch(console.warn);
+    }
+    addNotification({
+      title: 'Contact Phones Updated',
+      titleAr: 'تم حفظ أرقام التواصل بنجاح 📞',
+      message: 'Your call phones and WhatsApp number are now updated.',
+      messageAr: 'تم تحديث هاتفك الأساسي ورقم الواتساب بنجاح لضمان تواصل الركاب معك.',
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'driver_portal'
+    });
+  };
+
+  const verifyDriverPhone = (phone: string, code?: string): boolean => {
+    setIsDriverPhoneVerified(true);
+    if (currentUser) {
+      authService.updateUserRole(currentUser.uid, 'driver', {
+        phoneNumber: phone,
+        isPhoneVerified: true,
+        isDriverVerified: true
+      }).catch(console.warn);
+    }
+    addNotification({
+      title: 'Phone Verified Successfully',
+      titleAr: 'تم التحقق من رقم الهاتف بنجاح 🟢',
+      message: `Captain account (${phone}) verified. You can now open unlimited trips.`,
+      messageAr: `تم توثيق وتأكيد رقم الهاتف (${phone}) بنجاح. حسابك مفعل لفتح الرحلات واستقبال الركاب مجاناً.`,
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'driver_portal'
+    });
+    return true;
+  };
+
+  const updateTripLifecycleStatus = (listingId: string, status: TripLifecycleStatus) => {
+    const nowStr = new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
+    let targetListing: InterCityTripListing | undefined;
+
+    setIntercityListings(prev => prev.map(l => {
+      if (l.id === listingId) {
+        targetListing = l;
+        const updated: InterCityTripListing = {
+          ...l,
+          tripStatus: status,
+          statusUpdatedAt: nowStr,
+          availableSeats: status === 'full' ? 0 : (status === 'arrived' ? 0 : l.availableSeats)
+        };
+        listingsService.addListing(updated).catch(console.warn);
+        return updated;
+      }
+      return l;
+    }));
+
+    if (status === 'departed') {
+      addNotification({
+        title: 'Trip Departed & Live Tracking Activated',
+        titleAr: '🚀 انطلاق الرحلة: تحركت المركبة وبدء التتبع الحي',
+        message: `Trip (${targetListing?.fromGovernorate} ➔ ${targetListing?.toGovernorate}) is now in transit.`,
+        messageAr: `أعطى الكابتن ${targetListing?.driverName || ''} إشارة الانطلاق للمركبة. تم تفعيل التتبع الحي وبث الإشعارات للعائلات والركاب.`,
+        type: 'transit_departure',
+        priority: 'urgent',
+        targetTab: 'fixed_plan',
+        locationName: targetListing?.fromGovernorate
+      });
+    } else if (status === 'arrived') {
+      addNotification({
+        title: 'Trip Arrived & Successfully Completed',
+        titleAr: '🏁 وصول بالسلامة: تم إغلاق وأرشفة الرحلة',
+        message: `Vehicle arrived at destination (${targetListing?.toGovernorate}). Driver ready for next route!`,
+        messageAr: `حمداً لله على السلامة! أتمت الرحلة وصولها إلى ${targetListing?.toGovernorate}. الحساب جاهز لفتح رحلة جديدة بدون إعادة تسجيل.`,
+        type: 'general',
+        priority: 'high',
+        targetTab: 'driver_portal'
+      });
+    } else if (status === 'full') {
+      addNotification({
+        title: 'Seats Full',
+        titleAr: '✅ اكتملت المقاعد: السيارة جاهزة للتحرك',
+        message: 'All seats booked. Ready for departure.',
+        messageAr: 'تم حجز كافة مقاعد الرحلة بالكامل وتأكيد قائمة الركاب.',
+        type: 'general',
+        priority: 'medium',
+        targetTab: 'driver_portal'
+      });
+    }
+  };
+
+  const resolveTripConflict = (
+    listingId: string, 
+    resolution: 'driver_confirmed' | 'office_confirmed' | 'synced_merged',
+    notes?: string
+  ) => {
+    setIntercityListings(prev => {
+      const target = prev.find(l => l.id === listingId);
+      const conflictingId = target?.conflictNotice?.conflictingListingId;
+
+      return prev.map(l => {
+        if (l.id === listingId || (conflictingId && l.id === conflictingId)) {
+          const updated: InterCityTripListing = {
+            ...l,
+            conflictNotice: l.conflictNotice ? {
+              ...l.conflictNotice,
+              resolutionStatus: resolution,
+              resolutionNotes: notes || 'تمت المطابقة والاعتماد بالتنسيق بين الجهتين'
+            } : undefined
+          };
+          listingsService.addListing(updated).catch(console.warn);
+          return updated;
+        }
+        return l;
+      });
+    });
+
+    addNotification({
+      title: 'Trip Conflict Resolved',
+      titleAr: 'تم فض تعارض رحلة لوحة السيارة بنجاح',
+      message: `Conflict resolution set to ${resolution}.`,
+      messageAr: `تمت تسوية وتأكيد الرحلة للوحة المركبة بنجاح.`,
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'admin_control'
+    });
+  };
+
   const addIntercityListing = (listingData: Omit<InterCityTripListing, 'id'>) => {
+    const newId = `intercity-${Date.now()}`;
+    const initialStatus: TripLifecycleStatus = listingData.tripStatus || 'open';
+    
+    // Check Plate Collision with existing listings
+    const collision = checkPlateCollision(listingData, intercityListings);
+
+    let finalConflictNotice: TripConflictNotice | undefined = undefined;
+
+    if (collision.hasConflict && collision.conflictingListing && collision.conflictNotice) {
+      finalConflictNotice = collision.conflictNotice;
+
+      // Update the conflicting listing too
+      setIntercityListings(prev => prev.map(l => {
+        if (l.id === collision.conflictingListing?.id) {
+          const updatedConflicting: InterCityTripListing = {
+            ...l,
+            conflictNotice: {
+              isConflictDetected: true,
+              conflictingListingId: newId,
+              conflictingEntityName: listingData.operatorType === 'company' ? (listingData.companyName || 'مكتب نقل') : listingData.driverName,
+              conflictingEntityType: listingData.operatorType,
+              matchedPlateNumber: listingData.vehiclePlateNumber,
+              detectedAt: new Date().toISOString(),
+              resolutionStatus: 'unresolved'
+            }
+          };
+          listingsService.addListing(updatedConflicting).catch(console.warn);
+          return updatedConflicting;
+        }
+        return l;
+      }));
+
+      // Broadcast urgent collision alert
+      addNotification({
+        title: 'Vehicle Plate Conflict Detected!',
+        titleAr: `⚠️ تنبيه تعارض: تكرار لوحة المركبة [${listingData.vehiclePlateNumber}]`,
+        message: `Trip collision between ${listingData.driverName} and ${collision.conflictingListing.driverName || collision.conflictingListing.companyName}.`,
+        messageAr: `تم رصد إعلانين لنفس لوحة السيارة (${listingData.vehiclePlateNumber}) لتاريخ ${listingData.departureDate} بين (${listingData.operatorType === 'company' ? listingData.companyName : listingData.driverName}) و (${collision.conflictingListing.companyName || collision.conflictingListing.driverName}). تم إشعار الطرفين ومسافري الرحلة للتأكيد.`,
+        type: 'safety_alert',
+        priority: 'urgent',
+        targetTab: 'admin_control'
+      });
+    }
+
     const newListing: InterCityTripListing = {
       ...listingData,
-      id: `intercity-${Date.now()}`
+      id: newId,
+      tripStatus: initialStatus,
+      statusUpdatedAt: new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' }),
+      conflictNotice: finalConflictNotice
     };
+
     setIntercityListings(prev => [newListing, ...prev]);
     listingsService.addListing(newListing).catch(console.warn);
+  };
+
+  const processDriverSMS = (smsText: string, senderPhone?: string): ParsedSMSResult => {
+    const result = parseIncomingSMS(smsText, senderPhone || '+967770000000');
+
+    if (!result.success) {
+      return result;
+    }
+
+    if (result.action === 'open_trip' && result.createdListing) {
+      addIntercityListing(result.createdListing as Omit<InterCityTripListing, 'id'>);
+    } else if (result.action === 'depart_trip' && result.targetTripCode) {
+      const match = intercityListings.find(l => l.familyTrackingCode.includes(result.targetTripCode!) || l.vehiclePlateNumber.includes(result.targetTripCode!));
+      if (match) {
+        updateTripLifecycleStatus(match.id, 'departed');
+      }
+    } else if (result.action === 'arrive_trip' && result.targetTripCode) {
+      const match = intercityListings.find(l => l.familyTrackingCode.includes(result.targetTripCode!) || l.vehiclePlateNumber.includes(result.targetTripCode!));
+      if (match) {
+        updateTripLifecycleStatus(match.id, 'arrived');
+      }
+    } else if (result.action === 'mark_full' && result.targetTripCode) {
+      const match = intercityListings.find(l => l.familyTrackingCode.includes(result.targetTripCode!) || l.vehiclePlateNumber.includes(result.targetTripCode!));
+      if (match) {
+        updateTripLifecycleStatus(match.id, 'full');
+      }
+    } else if (result.action === 'road_alert') {
+      addNotification({
+        title: 'SMS Road Alert from Captain',
+        titleAr: '⚠️ تنبيه طريق من الكابتن (عبر SMS)',
+        message: result.roadAlertText || 'Road hazard reported.',
+        messageAr: `ورد تنبيه عاجل من كابتن الرحلة عبر SMS: ${result.roadAlertText}`,
+        type: 'safety_alert',
+        priority: 'urgent',
+        targetTab: 'fixed_plan'
+      });
+    }
+
+    return result;
   };
 
   const bookIntercityListing = (
@@ -605,7 +1328,7 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const newBooking: Booking = {
         id: `book-${Date.now()}`,
         type: listing.vehicleType === 'large_bus' ? 'bus' : 'intercity_car',
-        title: `${modeLabel}: ${listing.vehicleModel} (${listing.fromGovernorate} ➔ ${listing.toGovernorate})`,
+        title: `${modeLabel}: ${listing.vehicleModel} (${listing.fromGovernorate} ← ${listing.toGovernorate})`,
         provider: listing.operatorType === 'company' ? (listing.companyName || 'شركة نقل معتمدة') : `الكابتن: ${listing.driverName}`,
         referenceNumber: `YEM-${Math.floor(100000 + Math.random() * 900000)}`,
         status: 'confirmed',
@@ -644,7 +1367,7 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     addNotification({
       title: `Transit Departure Confirmed: ${listing.fromGovernorate} ➔ ${listing.toGovernorate}`,
-      titleAr: `تم تأكيد حجز رحلة النقل: ${listing.fromGovernorate} ➔ ${listing.toGovernorate}`,
+      titleAr: `تم تأكيد حجز رحلة النقل: ${listing.fromGovernorate} ← ${listing.toGovernorate}`,
       message: `Confirmed booking with ${listing.driverName} (${listing.vehicleModel}). Scheduled departure at ${listing.departureTime}.`,
       messageAr: `تم تأكيد حجزك بنجاح مع الكابتن ${listing.driverName} (${listing.vehicleModel}). موعد الانطلاق المحدد: ${listing.departureTime}. تم تفعيل كود التتبع العائلي.`,
       type: 'transit_departure',
@@ -653,6 +1376,137 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       targetTab: 'fixed_plan',
       locationName: `${listing.fromGovernorate} — ${listing.fromCity}`
     });
+  };
+
+  const addTransportOffice = (officeData: Omit<TransportOffice, 'id'>) => {
+    const newOffice: TransportOffice = {
+      ...officeData,
+      id: `office-${Date.now()}`
+    };
+    setTransportOffices(prev => [newOffice, ...prev]);
+    transportOfficesService.saveOffice(newOffice).catch(console.warn);
+  };
+
+  const updateTransportOffice = (office: TransportOffice) => {
+    setTransportOffices(prev => prev.map(o => o.id === office.id ? office : o));
+    transportOfficesService.saveOffice(office).catch(console.warn);
+  };
+
+  const deleteTransportOffice = (officeId: string) => {
+    setTransportOffices(prev => prev.filter(o => o.id !== officeId));
+    transportOfficesService.deleteOffice(officeId).catch(console.warn);
+    addNotification({
+      title: 'Transport Office Removed',
+      titleAr: 'تم حذف المكتب وإلغاء ظهوره في شبكة المسافر',
+      message: 'Transport office profile deleted by administrator.',
+      messageAr: 'تم حذف ملف وبيانات المكتب من لوحة الإدارة بنجاح.',
+      type: 'general',
+      priority: 'low',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const toggleOfficeVisibility = (officeId: string, isVisible: boolean, blockReason?: string) => {
+    setTransportOffices(prev => prev.map(o => {
+      if (o.id === officeId) {
+        const updated: TransportOffice = {
+          ...o,
+          isVisibleToPublic: isVisible,
+          subscriptionStatus: isVisible ? 'active' : 'suspended',
+          adminBlockReason: isVisible ? undefined : (blockReason || 'محجوب بقرار إداري لعدم تجديد الاشتراك الشهري')
+        };
+        transportOfficesService.updateSubscription(officeId, {
+          isVisibleToPublic: isVisible,
+          subscriptionStatus: isVisible ? 'active' : 'suspended',
+          adminBlockReason: isVisible ? undefined : (blockReason || 'محجوب بقرار إداري لعدم تجديد الاشتراك الشهري')
+        }).catch(console.warn);
+        return updated;
+      }
+      return o;
+    }));
+
+    addNotification({
+      title: isVisible ? 'Office Activated' : 'Office Blocked',
+      titleAr: isVisible ? 'تم تفعيل وإظهار المكتب في السوق' : 'تم حجب المكتب من الظهور العام',
+      message: `Office visibility status updated to ${isVisible ? 'Visible' : 'Hidden'}.`,
+      messageAr: isVisible ? 'أصبح المكتب ظاهراً للجمهور والمسافرين في تطبيق المسافر.' : 'تم حجب هذا المكتب والأسطول التابع له عن الجمهور لعدم الاشتراك.',
+      type: 'general',
+      priority: isVisible ? 'medium' : 'high',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const updateOfficeSubscription = (officeId: string, updates: Partial<TransportOffice>) => {
+    setTransportOffices(prev => prev.map(o => {
+      if (o.id === officeId) {
+        const updated = { ...o, ...updates };
+        transportOfficesService.updateSubscription(officeId, updates).catch(console.warn);
+        return updated;
+      }
+      return o;
+    }));
+
+    addNotification({
+      title: 'Subscription Updated',
+      titleAr: 'تم تحديث بيانات اشتراك المكتب بنجاح',
+      message: 'Subscription tier and validity period updated by administrator.',
+      messageAr: 'تم حفظ باقة الاشتراك وتاريخ الصلاحية الجديد للمكتب.',
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const deleteIntercityListing = (listingId: string) => {
+    setIntercityListings(prev => prev.filter(l => l.id !== listingId));
+    listingsService.deleteListing(listingId).catch(console.warn);
+  };
+
+  const toggleListingVerification = (listingId: string, isVerified: boolean) => {
+    setIntercityListings(prev => prev.map(l => {
+      if (l.id === listingId) {
+        const updated = { ...l, isVerifiedDriver: isVerified };
+        listingsService.addListing(updated).catch(console.warn);
+        return updated;
+      }
+      return l;
+    }));
+  };
+
+  const adminSetFamilyTracking = (listingId: string, allowsTracking: boolean, customCode?: string) => {
+    setIntercityListings(prev => prev.map(l => {
+      if (l.id === listingId) {
+        let code = l.familyTrackingCode;
+        if (allowsTracking && (!code || code.trim() === '')) {
+          const fromGovInitial = l.fromGovernorate?.substring(0, 2) || 'AD';
+          code = customCode || `YEM-${fromGovInitial}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+        const updated = { 
+          ...l, 
+          allowsFamilyTracking: allowsTracking,
+          familyTrackingCode: allowsTracking ? (customCode || code) : ''
+        };
+        listingsService.addListing(updated).catch(console.warn);
+        return updated;
+      }
+      return l;
+    }));
+  };
+
+  const addFleetVehicleToOffice = (officeId: string, vehicleData: Omit<FleetVehicle, 'id'>) => {
+    const newVehicle: FleetVehicle = {
+      ...vehicleData,
+      id: `v-${Date.now()}`
+    };
+    setTransportOffices(prev => prev.map(o => {
+      if (o.id === officeId) {
+        return {
+          ...o,
+          fleetVehicles: [newVehicle, ...(o.fleetVehicles || [])]
+        };
+      }
+      return o;
+    }));
   };
 
   const addDay = (tripId: string, title?: string, titleAr?: string) => {
@@ -968,6 +1822,35 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         intercityListings,
         addIntercityListing,
         bookIntercityListing,
+        updateTripLifecycleStatus,
+        resolveTripConflict,
+        driverVehicles,
+        activeDriverVehicleId,
+        setActiveDriverVehicleId,
+        addDriverVehicle,
+        removeDriverVehicle,
+        isDriverPhoneVerified,
+        verifyDriverPhone,
+        completeCaptainProfile,
+        updateContactPhones,
+        chatMessages,
+        sendChatMessage,
+        adminReplyChatMessage,
+        faqs,
+        addFaqItem,
+        isChatOpen,
+        setIsChatOpen,
+        processDriverSMS,
+        transportOffices,
+        addTransportOffice,
+        updateTransportOffice,
+        deleteTransportOffice,
+        toggleOfficeVisibility,
+        updateOfficeSubscription,
+        addFleetVehicleToOffice,
+        deleteIntercityListing,
+        toggleListingVerification,
+        adminSetFamilyTracking,
         addTrip,
         updateTrip,
         deleteTrip,
