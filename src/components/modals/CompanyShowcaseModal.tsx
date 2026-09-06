@@ -28,15 +28,13 @@ interface CompanyShowcaseModalProps {
   onClose: () => void;
   office: TransportOffice | null;
   onOpenBookingForTrip?: (listing: InterCityTripListing) => void;
-  onOpenSocialPosterForOffice?: (office: TransportOffice) => void;
 }
 
 export const CompanyShowcaseModal: React.FC<CompanyShowcaseModalProps> = ({
   isOpen,
   onClose,
   office,
-  onOpenBookingForTrip,
-  onOpenSocialPosterForOffice
+  onOpenBookingForTrip
 }) => {
   const { lang, intercityListings } = useTravel();
   const [activeTab, setActiveTab] = useState<'overview' | 'fleet' | 'trips' | 'branches'>('overview');
@@ -77,20 +75,6 @@ export const CompanyShowcaseModal: React.FC<CompanyShowcaseModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
-
-          {/* Social Auto-Poster Quick Action */}
-          {onOpenSocialPosterForOffice && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenSocialPosterForOffice(office);
-              }}
-              className="absolute top-4 start-4 px-3 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-md transition z-20"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{lang === 'ar' ? '📢 توليد بوست تسويقي ذكي' : 'AI Social Media Ad'}</span>
-            </button>
-          )}
 
           {/* Company Identity Overlay */}
           <div className="absolute bottom-4 start-4 end-4 flex items-end justify-between gap-4 z-10">

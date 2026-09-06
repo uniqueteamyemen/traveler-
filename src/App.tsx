@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TravelProvider, useTravel } from './context/TravelContext';
 import { Header } from './components/Header';
 import { TripOverview } from './components/TripOverview';
@@ -24,12 +24,26 @@ import { LiveNotificationToast } from './components/LiveNotificationToast';
 import { AuthControlModal } from './components/modals/AuthControlModal';
 import { RoadAlertsModal } from './components/modals/RoadAlertsModal';
 import { FamilyLiveTrackingModal } from './components/modals/FamilyLiveTrackingModal';
-import { SocialMediaAutoPosterModal } from './components/modals/SocialMediaAutoPosterModal';
 import { InAppSupportChatModal } from './components/modals/InAppSupportChatModal';
 import { MessageSquare } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { activeTab, activeTrip, lang, setIsChatOpen, chatMessages } = useTravel();
+  const { activeTab, activeTrip, lang, setIsChatOpen, chatMessages, setActiveTab } = useTravel();
+
+  // Handle URL Deep-Linking: ?portal=captains or ?portal=passenger or hashes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const portal = params.get('portal') || params.get('role');
+      const hash = (window.location.hash || '').toLowerCase();
+
+      if (portal === 'captains' || portal === 'captain' || portal === 'driver' || portal === 'owners' || hash === '#captain') {
+        setActiveTab('driver_portal');
+      } else if (portal === 'passenger' || portal === 'traveler' || portal === 'trips' || hash === '#trips') {
+        setActiveTab('intercity_hub');
+      }
+    }
+  }, [setActiveTab]);
 
   // Modals state
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
@@ -42,7 +56,6 @@ const AppContent: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isRoadAlertsOpen, setIsRoadAlertsOpen] = useState(false);
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
-  const [isSocialPosterOpen, setIsSocialPosterOpen] = useState(false);
 
   const handleOpenNewActivity = (dayId?: string) => {
     setSelectedDayForActivity(dayId);
@@ -58,7 +71,6 @@ const AppContent: React.FC = () => {
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenRoadAlerts={() => setIsRoadAlertsOpen(true)}
         onOpenLiveTracking={() => setIsLiveTrackingOpen(true)}
-        onOpenSocialPoster={() => setIsSocialPosterOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -163,7 +175,6 @@ const AppContent: React.FC = () => {
       <AuthControlModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <RoadAlertsModal isOpen={isRoadAlertsOpen} onClose={() => setIsRoadAlertsOpen(false)} />
       <FamilyLiveTrackingModal isOpen={isLiveTrackingOpen} onClose={() => setIsLiveTrackingOpen(false)} />
-      <SocialMediaAutoPosterModal isOpen={isSocialPosterOpen} onClose={() => setIsSocialPosterOpen(false)} />
       
       {/* Zero Cost In-App Support Chat & Community FAQ Modal */}
       <InAppSupportChatModal />

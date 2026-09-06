@@ -3,7 +3,6 @@ import { useTravel } from '../context/TravelContext';
 import { YEMEN_GOVERNORATES } from '../data/yemenData';
 import { InterCityTripListing, TransportOffice } from '../types/travel';
 import { CompanyShowcaseModal } from './modals/CompanyShowcaseModal';
-import { SocialMediaAutoPosterModal } from './modals/SocialMediaAutoPosterModal';
 import { AboutPlatformModal } from './modals/AboutPlatformModal';
 import { CustomTripRequestModal } from './modals/CustomTripRequestModal';
 import { 
@@ -61,12 +60,6 @@ export const IntercityHub: React.FC = () => {
   // Company Showcase Modal State
   const [selectedOffice, setSelectedOffice] = useState<TransportOffice | null>(null);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-
-  // Social Auto-Poster Modal State
-  const [socialPosterListing, setSocialPosterListing] = useState<InterCityTripListing | null>(null);
-  const [socialPosterOffice, setSocialPosterOffice] = useState<TransportOffice | null>(null);
-  const [isSocialPosterOpen, setIsSocialPosterOpen] = useState(false);
-  const [socialCampaignType, setSocialCampaignType] = useState<'driver_recruitment' | 'trip_announcement'>('driver_recruitment');
 
   // Competitor parity modals: About Platform & Custom Trip Request
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
@@ -150,20 +143,6 @@ export const IntercityHub: React.FC = () => {
     setIsCompanyModalOpen(true);
   };
 
-  const handleOpenTripSocialPoster = (listing: InterCityTripListing) => {
-    setSocialPosterListing(listing);
-    setSocialPosterOffice(null);
-    setSocialCampaignType('trip_announcement');
-    setIsSocialPosterOpen(true);
-  };
-
-  const handleOpenRecruitmentSocialPoster = (office?: TransportOffice) => {
-    setSocialPosterListing(null);
-    setSocialPosterOffice(office || transportOffices[0] || null);
-    setSocialCampaignType('driver_recruitment');
-    setIsSocialPosterOpen(true);
-  };
-
   return (
     <div className="space-y-6">
       
@@ -195,22 +174,14 @@ export const IntercityHub: React.FC = () => {
             </p>
           </div>
 
-          {/* Social Auto-Poster & Office Trigger Quick Actions */}
+          {/* Captain & Fleet Portal Quick Trigger */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
-              onClick={() => handleOpenRecruitmentSocialPoster()}
-              className="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-600/30 transition active:scale-95"
-            >
-              <Sparkles className="w-4 h-4 animate-pulse" />
-              <span>{lang === 'ar' ? '📢 مولّد البوستات الذكي (AI Auto-Poster)' : 'AI Social Media Studio'}</span>
-            </button>
-            
-            <button
               onClick={() => setActiveTab('driver_portal')}
-              className="px-4 py-2.5 rounded-2xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-bold flex items-center gap-2 transition"
+              className="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30 transition active:scale-95"
             >
-              <Car className="w-4 h-4 text-amber-400" />
-              <span>{lang === 'ar' ? 'بوابة الكباتن وإدارة الأسطول' : 'Driver & Fleet Portal'}</span>
+              <Car className="w-4 h-4" />
+              <span>{lang === 'ar' ? 'بوابة الكباتن وملاك السيارات 🚗' : 'Driver & Fleet Portal'}</span>
             </button>
           </div>
         </div>
@@ -337,18 +308,10 @@ export const IntercityHub: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleOpenOfficeDetails(office)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs"
+                        className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs"
                       >
                         <Building2 className="w-3.5 h-3.5" />
                         <span>{lang === 'ar' ? 'بروفايل الشركة والأسطول' : 'View Company'}</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleOpenRecruitmentSocialPoster(office)}
-                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-700 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-200 transition"
-                        title="توليد بوست تسويقي لهذه الشركة"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-500" />
                       </button>
                     </div>
                   </div>
@@ -691,17 +654,7 @@ export const IntercityHub: React.FC = () => {
                   </div>
 
                   {/* Actions Row */}
-                  <div className="pt-2 border-t border-stone-100 dark:border-stone-700 flex flex-wrap items-center justify-between gap-2">
-                    {/* Social Auto-Poster Trigger Button */}
-                    <button
-                      onClick={() => handleOpenTripSocialPoster(listing)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center gap-1.5 transition border border-amber-200 dark:border-amber-800/40"
-                      title="توليد بوست وتصميم سوشيال ميديا فوري لهذه الرحلة"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{lang === 'ar' ? '📢 نشر وتسويق ذكي' : 'AI Social Post'}</span>
-                    </button>
-
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-700 flex flex-wrap items-center justify-end gap-2">
                     {/* Booking Buttons */}
                     <div className="flex items-center gap-2">
                       {allowsFullCar && (
@@ -942,16 +895,6 @@ export const IntercityHub: React.FC = () => {
         onClose={() => setIsCompanyModalOpen(false)}
         office={selectedOffice}
         onOpenBookingForTrip={(listing) => handleOpenBooking(listing)}
-        onOpenSocialPosterForOffice={(office) => handleOpenRecruitmentSocialPoster(office)}
-      />
-
-      {/* AI Social Media Auto-Poster Modal */}
-      <SocialMediaAutoPosterModal
-        isOpen={isSocialPosterOpen}
-        onClose={() => setIsSocialPosterOpen(false)}
-        initialListing={socialPosterListing}
-        initialOffice={socialPosterOffice}
-        initialCampaignType={socialCampaignType}
       />
 
       {/* About Traveler Platform Intermediary & Safety Modal */}

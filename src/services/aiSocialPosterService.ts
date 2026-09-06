@@ -34,7 +34,7 @@ function generateDriverRecruitmentPost(
   office?: TransportOffice | null
 ): SocialPostGenerated {
   const id = `recruitment-driver-${Date.now()}`;
-  const appLink = 'https://safar-yemen.app/join-drivers';
+  const appLink = 'https://deterministicsolutionsdesign.com/?portal=captains';
 
   if (tone === 'authentic_yemeni') {
     const headline = 'يا كباتن اليمن يا راعي الصالون والباص.. تسجيلك مجاني 100% وركابك جاهزين قبل ما تدق سلف! 🇾🇪';
@@ -216,7 +216,7 @@ function generatePassengerRecruitmentPost(
   office?: TransportOffice | null
 ): SocialPostGenerated {
   const id = `recruitment-passenger-${Date.now()}`;
-  const appLink = 'https://safar-yemen.app/book';
+  const appLink = 'https://deterministicsolutionsdesign.com/?portal=passenger';
 
   const hashtags = [
     '#تسجيل_مجاني',
@@ -368,7 +368,7 @@ function generateTripAnnouncementPost(
   const tracking = listing?.familyTrackingCode || 'YEM-AD-MK-772';
   const isReturn = listing?.tripNature === 'return_match';
 
-  const bookingLink = `https://safar-yemen.app/trip/${listing?.id || 'live-trip'}`;
+  const bookingLink = `https://deterministicsolutionsdesign.com/?portal=passenger&trip=${listing?.id || 'live-trip'}`;
   const returnBadge = isReturn ? '🔥 رحلة راجع شاغرة بخصم خاص!' : '✨ رحلة مجدولة ومؤكدة الانطلاق';
 
   const hashtags = [

@@ -156,8 +156,15 @@ export const FamilyLiveTrackingModal: React.FC<FamilyLiveTrackingModalProps> = (
 
   const currentCode = currentLocationData?.tripCode || trackingCodeInput;
 
+  const getLiveTrackUrl = () => {
+    const origin = (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null')
+      ? window.location.origin
+      : 'https://deterministicsolutionsdesign.com';
+    return `${origin}/live-track?code=${encodeURIComponent(currentCode)}`;
+  };
+
   const handleCopyLink = () => {
-    const link = `https://traveler-yemen.app/live-track?code=${encodeURIComponent(currentCode)}`;
+    const link = getLiveTrackUrl();
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -166,7 +173,8 @@ export const FamilyLiveTrackingModal: React.FC<FamilyLiveTrackingModalProps> = (
   const handleShareWhatsApp = () => {
     const city = currentLocationData?.currentCityOrPassAr || 'على مسار الخط بين المحافظات';
     const roadNotice = currentLocationData?.activeRoadNotice ? `\n⚠️ ${currentLocationData.activeRoadNotice.titleAr}: ${currentLocationData.activeRoadNotice.messageAr}` : '';
-    const text = `🇾🇪 *تحديث مسار رحلة تطبيق المسافر (Traveler) — تتبع مشفر*\n\n🔒 *كود الأمان والتتبع:* ${currentCode}\n📍 *الموقع الحالي:* ${city}\n📱 *مصدر التتبع:* ${currentLocationData?.sourceName || 'هاتف الرحلة المباشر'}\n⏱ *آخر تحديث:* ${currentLocationData?.lastUpdated || 'الآن'}${roadNotice}\n\n🔗 *رابط المتابعة العائلية الحية:* https://traveler-yemen.app/live-track?code=${encodeURIComponent(currentCode)}\n\n_الحمد لله الرحلة تسير بأمان وفق خطة المحطات المعتمدة._`;
+    const trackUrl = getLiveTrackUrl();
+    const text = `🇾🇪 *تحديث مسار رحلة تطبيق المسافر (Traveler) — تتبع مشفر*\n\n🔒 *كود الأمان والتتبع:* ${currentCode}\n📍 *الموقع الحالي:* ${city}\n📱 *مصدر التتبع:* ${currentLocationData?.sourceName || 'هاتف الرحلة المباشر'}\n⏱ *آخر تحديث:* ${currentLocationData?.lastUpdated || 'الآن'}${roadNotice}\n\n🔗 *رابط المتابعة العائلية الحية:* ${trackUrl}\n\n_الحمد لله الرحلة تسير بأمان وفق خطة المحطات المعتمدة._`;
 
     const encoded = encodeURIComponent(text);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');

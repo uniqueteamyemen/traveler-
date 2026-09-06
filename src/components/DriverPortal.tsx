@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useTravel } from '../context/TravelContext';
 import { YEMEN_GOVERNORATES } from '../data/yemenData';
 import { PlannedStop, TransportOffice, FleetVehicle, OfficeBranch, InterCityTripListing, RoadAlertReason, SocialCampaignType } from '../types/travel';
-import { SocialMediaAutoPosterModal } from './modals/SocialMediaAutoPosterModal';
-import { SocialMediaAutomator } from './SocialMediaAutomator';
 import { CompanyShowcaseModal } from './modals/CompanyShowcaseModal';
 import { FamilyLiveTrackingModal } from './modals/FamilyLiveTrackingModal';
 import { liveTrackingService } from '../services/liveTrackingService';
@@ -64,10 +62,9 @@ export const DriverPortal: React.FC = () => {
   );
 
   const [activeTabSub, setActiveTabSub] = useState<
-    'dashboard' | 'register' | 'garage' | 'sms_portal' | 'offices_mgmt' | 'social_automator' | 'live_broadcast' | 'why_join' | 'verification'
+    'dashboard' | 'register' | 'garage' | 'sms_portal' | 'offices_mgmt' | 'live_broadcast' | 'why_join' | 'verification'
   >('dashboard');
   const [successMessage, setSuccessMessage] = useState(false);
-  const [createdListingForPoster, setCreatedListingForPoster] = useState<InterCityTripListing | null>(null);
 
   // Live Broadcast State for Captain
   const [captainTripCode, setCaptainTripCode] = useState('YEM-AD-MK-772');
@@ -78,24 +75,26 @@ export const DriverPortal: React.FC = () => {
   const [captainAlertText, setCaptainAlertText] = useState('');
   const [alertSuccessToast, setAlertSuccessToast] = useState(false);
 
-  // Social Auto-Poster Modal State
-  const [isSocialPosterOpen, setIsSocialPosterOpen] = useState(false);
-  const [socialPosterListing, setSocialPosterListing] = useState<InterCityTripListing | null>(null);
-  const [socialPosterOffice, setSocialPosterOffice] = useState<TransportOffice | null>(null);
-  const [socialCampaignType, setSocialCampaignType] = useState<SocialCampaignType>('driver_recruitment');
-
   // Company Preview Modal State
   const [previewOffice, setPreviewOffice] = useState<TransportOffice | null>(null);
   const [isPreviewOfficeOpen, setIsPreviewOfficeOpen] = useState(false);
 
-  // Form State for Trip Posting
+  // Links & Invites State
   const [copiedCaptainLink, setCopiedCaptainLink] = useState(false);
+  const [copiedPassengerLink, setCopiedPassengerLink] = useState(false);
 
   const getCaptainInviteUrl = () => {
     if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
-      return `${window.location.origin}${window.location.pathname}#captain`;
+      return `${window.location.origin}/?portal=captains`;
     }
-    return 'https://ais-dev-dummeibmuc4sqbstlkmakt-110937883528.europe-west2.run.app/#captain';
+    return 'https://deterministicsolutionsdesign.com/?portal=captains';
+  };
+
+  const getPassengerInviteUrl = () => {
+    if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
+      return `${window.location.origin}/?portal=passenger`;
+    }
+    return 'https://deterministicsolutionsdesign.com/?portal=passenger';
   };
 
   const handleCopyCaptainLink = () => {
@@ -107,7 +106,7 @@ export const DriverPortal: React.FC = () => {
         title: 'Captain Link Copied',
         titleAr: 'تم نسخ رابط الكباتن بنجاح 🔗',
         message: 'Share this link with captains to register and post trips without fees.',
-        messageAr: 'تم نسخ الرابط المباشر. يمكنك نشره في جروبات واتساب الكباتن وملاك السيارات في اليمن.',
+        messageAr: 'تم نسخ رابط الكباتن المباشر. يقودهم مباشرة للتسجيل والاطلاع على ميزات المنصة (مجاني 100% وبدون عمولات).',
         type: 'general',
         priority: 'low',
         targetTab: 'driver_portal'
@@ -115,15 +114,47 @@ export const DriverPortal: React.FC = () => {
     });
   };
 
+  const handleCopyPassengerLink = () => {
+    const url = getPassengerInviteUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedPassengerLink(true);
+      setTimeout(() => setCopiedPassengerLink(false), 3000);
+      addNotification({
+        title: 'Traveler Link Copied',
+        titleAr: 'تم نسخ رابط المسافرين بنجاح 🔗',
+        message: 'Share this link with passengers to book trips and track travel securely.',
+        messageAr: 'تم نسخ رابط المسافرين المباشر. يقود المسافر مباشرة لتصفح وحجز الرحلات بين المحافظات الـ22.',
+        type: 'general',
+        priority: 'low',
+        targetTab: 'intercity_hub'
+      });
+    });
+  };
+
   const handleShareCaptainOnWhatsApp = () => {
     const url = getCaptainInviteUrl();
-    const text = `🚗 السلام عليكم كباتن وملاك السيارات في اليمن،
-تطبيق «المسافر» (Traveler) يتيح لك الآن تسجيل سيارتك مجاناً وإعلان رحلاتك بين المحافظات وملء مقاعد الراجع بكل سهولة، مع ترويج ونشر رحلاتك عبر منصات إنستغرام وفيسبوك وجروبات السفر، وتواصل مباشر بالحجز أو المحادثات الفورية داخل التطبيق وإدارة الرحلات حتى بدون إنترنت عبر SMS.
+    const text = `🚗 *السلام عليكم كباتن وملاك السيارات في اليمن*
+تطبيق «المسافر» (Traveler) يتيح لك الآن تسجيل سيارتك مجاناً وإعلان رحلاتك بين المحافظات وملء مقاعد الراجع بكل سهولة:
+✨ تسجيل مجاني 100% بدون أي عمولة أو وسيط.
+📱 تواصل مباشر عبر الهاتف والواتساب مع الركاب.
+💬 إدارة وفتح الرحلات حتى بدون إنترنت عبر الرسائل النصية SMS.
+🛡️ تتبع وأمان عائلي مشفر لكل رحلة.
 
-📄 التسجيل متاح بالبطاقة الشخصية أو جواز السفر (يمكن إضافتها لاحقاً).
-التسجيل مجاني 100% في التطبيق!
+🔗 *رابط التسجيل وبوابة الكباتن المباشر:*
+${url}`;
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
-🔗 رابط التسجيل وإعلان رحلتك المباشر:
+  const handleSharePassengerOnWhatsApp = () => {
+    const url = getPassengerInviteUrl();
+    const text = `🛣️ *منصة المسافر (Traveler) — دليلك وحجزك لرحلات المحافظات اليمنية*
+احجز مقعدك بالنفر أو سيارة صالون كاملة VIP بين الـ 22 محافظة يمنية:
+✅ حجز مباشر مع الكابتن المعتمد بدون وسيط أو عمولة.
+🛡️ كود تتبع عائلي مشفر لمتابعة خط سيرك أولاً بأول.
+🚗 تحديثات حية للنقاط الأمنية والعقبات الجبلية.
+
+🔗 *رابط حجز وتصفح الرحلات المباشر:*
 ${url}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank');
@@ -258,7 +289,6 @@ ${url}`;
     };
 
     addIntercityListing(newTripData);
-    setCreatedListingForPoster(newTripData);
     setSuccessMessage(true);
   };
 
@@ -343,20 +373,6 @@ ${url}`;
     setNewVehiclePlate('');
   };
 
-  const handleLaunchPosterForTrip = (trip: InterCityTripListing) => {
-    setSocialPosterListing(trip);
-    setSocialPosterOffice(null);
-    setSocialCampaignType('trip_announcement');
-    setIsSocialPosterOpen(true);
-  };
-
-  const handleLaunchPosterForOffice = (office: TransportOffice) => {
-    setSocialPosterListing(null);
-    setSocialPosterOffice(office);
-    setSocialCampaignType('driver_recruitment');
-    setIsSocialPosterOpen(true);
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
@@ -374,71 +390,129 @@ ${url}`;
           </h2>
           <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
             {lang === 'ar'
-              ? 'سواءً كنت كابتن مستقل تمتلك سيارة صالون 4x4 أو صاحب شركة نقل تمتلك أسطول باصات وسيارات، تطبيق المسافر يوفر لك حجوزات مؤكدة وأدوات تسويق ذكية لنشر رحلاتك على السوشيال ميديا في ثوانٍ.'
-              : 'Register your vehicle or manage your company fleet profile, schedule departures, and automate social media advertising.'}
+              ? 'سواءً كنت كابتن مستقل تمتلك سيارة صالون 4x4 أو صاحب شركة نقل تمتلك أسطول باصات وسيارات، تطبيق المسافر يوفر لك حجوزات مؤكدة وتواصل مباشر مع الركاب بدون عمولات، مع إمكانية فتح الرحلات حتى بدون نت عبر SMS.'
+              : 'Register your vehicle, schedule departures, receive direct passenger bookings with 0% commission, and manage trips even offline via SMS.'}
           </p>
         </div>
 
-        {/* Floating AI Social Auto-Poster Button */}
+        {/* Quick Action Navigation Buttons */}
         <div className="mt-5 relative z-10 flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => handleLaunchPosterForOffice(transportOffices[0])}
-            className="px-4 py-2 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-600/30 transition active:scale-95"
+            onClick={() => setActiveTabSub('register')}
+            className="px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-600/30 transition active:scale-95"
           >
-            <Sparkles className="w-4 h-4 animate-pulse" />
-            <span>{lang === 'ar' ? '📢 مولّد البوستات الذكي (AI Auto-Poster)' : 'AI Social Ad Generator'}</span>
+            <Plus className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'تسجيل كابتن جديد / فتح رحلة 🚗' : 'Register Captain / Post Trip'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTabSub('why_join')}
+            className="px-4 py-2.5 rounded-2xl bg-stone-800/90 hover:bg-stone-700 text-amber-300 text-xs font-bold transition border border-amber-500/30"
+          >
+            {lang === 'ar' ? 'ميزات المنصة (مجاني 100%) ✨' : 'Platform Benefits (Free)'}
           </button>
 
           <button
             onClick={() => setActiveTab('intercity_hub')}
-            className="px-4 py-2 rounded-2xl bg-stone-800/80 hover:bg-stone-700 text-stone-200 text-xs font-bold transition border border-stone-700"
+            className="px-4 py-2.5 rounded-2xl bg-stone-800/80 hover:bg-stone-700 text-stone-200 text-xs font-bold transition border border-stone-700"
           >
             {lang === 'ar' ? 'عرض الرحلات المفتوحة في المنصة' : 'Browse Live Trips'}
           </button>
         </div>
       </div>
 
-      {/* Share Captain Portal Link Bar */}
-      <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Share2 className="w-5 h-5" />
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xs sm:text-sm text-emerald-950 dark:text-emerald-200">
-                رابط مشاركة الكباتن وملاك السيارات المباشر 🔗
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100">
-                التسجيل مجاني في التطبيق ✨
-              </span>
+      {/* Dual Official Public Links: Captains & Passengers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        {/* Card 1: Captains & Fleet Owners Direct Link */}
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <Car className="w-5 h-5" />
             </div>
-            <p className="text-[11px] text-emerald-800 dark:text-emerald-300/80 mt-0.5">
-              انشر هذا الرابط في مجموعات واتساب وفيسبوك ليدخل السائق مباشرة إلى نموذج تسجيل سيارته وإعلان رحلاته.
-            </p>
+            <div className="text-right flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-xs sm:text-sm text-emerald-950 dark:text-emerald-200">
+                  {lang === 'ar' ? '1. رابط الكباتن وملاك السيارات المباشر 🔗' : '1. Captains & Vehicle Owners Direct Link'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100">
+                  {lang === 'ar' ? 'تسجيل مجاني 0% عمولة' : 'Free Registration'}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 dark:text-emerald-300/80 mt-1 leading-relaxed">
+                {lang === 'ar' 
+                  ? 'يقود السائق أو المالك مباشرة إلى واجهة التسجيل المعتمدة وشرح ميزات المنصة، دون أي صلاحيات تعديل غير ما يخص رحلاته فقط.'
+                  : 'Directs drivers to registration & benefits with strict access to only their personal trips.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-emerald-200 dark:border-emerald-800/60">
+            <div className="hidden sm:block flex-1 truncate text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-stone-600 dark:text-stone-300 select-all" dir="ltr">
+              {getCaptainInviteUrl()}
+            </div>
+
+            <button
+              onClick={handleCopyCaptainLink}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-900 dark:text-emerald-200 text-xs font-bold border border-emerald-300 dark:border-emerald-700 transition shadow-xs active:scale-95 whitespace-nowrap"
+            >
+              {copiedCaptainLink ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+              <span>{copiedCaptainLink ? (lang === 'ar' ? 'تم النسخ!' : 'Copied!') : (lang === 'ar' ? 'نسخ الرابط' : 'Copy')}</span>
+            </button>
+
+            <button
+              onClick={handleShareCaptainOnWhatsApp}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm active:scale-95 whitespace-nowrap"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'مشاركة واتساب' : 'WhatsApp'}</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <div className="hidden md:block max-w-[260px] truncate text-[11px] font-mono px-3 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-700 text-stone-600 dark:text-stone-300 select-all" dir="ltr">
-            {getCaptainInviteUrl()}
+        {/* Card 2: Passengers & Travel Booking Direct Link */}
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="text-right flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-xs sm:text-sm text-amber-950 dark:text-amber-200">
+                  {lang === 'ar' ? '2. رابط المسافرين وحجز الرحلات المباشر 🔗' : '2. Passenger Booking & Exploration Direct Link'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
+                  {lang === 'ar' ? 'تصفح وحجز فوري' : 'Live Booking'}
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300/80 mt-1 leading-relaxed">
+                {lang === 'ar'
+                  ? 'يقود المسافر مباشرة إلى تصفح وحجز المقاعد والسيارات بين الـ 22 محافظة، مع تتبع الأمان العائلي وأرقام التواصل المباشرة.'
+                  : 'Directs passengers straight to intercity booking across 22 governorates with encrypted family tracking.'}
+              </p>
+            </div>
           </div>
-          
-          <button
-            onClick={handleCopyCaptainLink}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-stone-900 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-900 dark:text-emerald-200 text-xs font-bold border border-emerald-300 dark:border-emerald-700 transition shadow-xs active:scale-95"
-          >
-            {copiedCaptainLink ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-            <span>{copiedCaptainLink ? 'تم نسخ الرابط!' : 'نسخ الرابط'}</span>
-          </button>
 
-          <button
-            onClick={handleShareCaptainOnWhatsApp}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm active:scale-95 whitespace-nowrap"
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>مشاركة عبر واتساب</span>
-          </button>
+          <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-800/60">
+            <div className="hidden sm:block flex-1 truncate text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-amber-300 dark:border-amber-700 text-stone-600 dark:text-stone-300 select-all" dir="ltr">
+              {getPassengerInviteUrl()}
+            </div>
+
+            <button
+              onClick={handleCopyPassengerLink}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-900 dark:text-amber-200 text-xs font-bold border border-amber-300 dark:border-amber-700 transition shadow-xs active:scale-95 whitespace-nowrap"
+            >
+              {copiedPassengerLink ? <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> : <Copy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
+              <span>{copiedPassengerLink ? (lang === 'ar' ? 'تم النسخ!' : 'Copied!') : (lang === 'ar' ? 'نسخ الرابط' : 'Copy')}</span>
+            </button>
+
+            <button
+              onClick={handleSharePassengerOnWhatsApp}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-sm active:scale-95 whitespace-nowrap"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'مشاركة واتساب' : 'WhatsApp'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -512,21 +586,6 @@ ${url}`;
           <span>{lang === 'ar' ? '🏢 مكاتب النقل والأسطول' : 'Office & Fleet Manager'}</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/30 text-white font-bold">
             {transportOffices.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTabSub('social_automator')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-            activeTabSub === 'social_automator'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-500/20'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-emerald-500" />
-          <span>{lang === 'ar' ? '📢 المسوق الآلي (AI Auto-Poster)' : 'Social Media Automator'}</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-800 dark:text-emerald-200 font-bold">
-            مجاني
           </span>
         </button>
 
@@ -605,26 +664,22 @@ ${url}`;
               </h3>
               <p className="text-xs text-emerald-700 dark:text-emerald-300 max-w-md mx-auto leading-relaxed">
                 {lang === 'ar'
-                  ? 'رحلتك متاحة الآن لآلاف المسافرين في المنصة. يمكنك الآن بنقرة واحدة توليد إعلان احترافي بالذكاء الاصطناعي مع صور عالية الدقة لنشرها على إنستغرام، فيسبوك، وواتساب!'
-                  : 'Your trip is now live. Launch the AI auto-poster to share on social media!'}
+                  ? 'رحلتك متاحة الآن لآلاف المسافرين في المنصة. سيتمكن الركاب من حجز المقاعد والتواصل معك هاتفياً أو عبر واتساب مباشرة.'
+                  : 'Your trip is now live. Passengers can now discover your trip and reach out to you directly!'}
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                {createdListingForPoster && (
-                  <button
-                    onClick={() => handleLaunchPosterForTrip(createdListingForPoster)}
-                    className="px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-600/30 transition"
-                  >
-                    <Sparkles className="w-4 h-4 animate-pulse" />
-                    <span>{lang === 'ar' ? '📢 توليد بوست تسويقي وتصميم HD للرحلة' : 'AI Social Media Ad'}</span>
-                  </button>
-                )}
-
                 <button
                   onClick={() => setActiveTab('intercity_hub')}
-                  className="px-4 py-2.5 rounded-2xl bg-stone-900 dark:bg-stone-700 text-white text-xs font-bold transition"
+                  className="px-5 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-md"
                 >
-                  {lang === 'ar' ? 'الانتقال للرحلات المفتوحة' : 'View in Hub'}
+                  {lang === 'ar' ? 'الانتقال إلى دليل الرحلات المفتوحة' : 'View in Hub'}
+                </button>
+                <button
+                  onClick={() => setSuccessMessage(false)}
+                  className="px-4 py-2.5 rounded-2xl bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-bold transition"
+                >
+                  {lang === 'ar' ? 'إضافة رحلة أخرى' : 'Post Another Trip'}
                 </button>
               </div>
             </div>
@@ -1124,15 +1179,6 @@ ${url}`;
                       <Plus className="w-3.5 h-3.5" />
                       <span>إضافة سيارة للأسطول</span>
                     </button>
-
-                    <button
-                      onClick={() => handleLaunchPosterForOffice(office)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
-                      title="توليد إعلان سوشيال ميديا"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>بوست تسويقي</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1437,17 +1483,6 @@ ${url}`;
         </div>
       )}
 
-      {/* SUB-TAB: SOCIAL MEDIA AUTOMATOR */}
-      {activeTabSub === 'social_automator' && (
-        <div className="space-y-4">
-          <SocialMediaAutomator
-            initialCampaignType="driver_recruitment"
-            initialOffice={transportOffices[0]}
-            isModalMode={false}
-          />
-        </div>
-      )}
-
       {/* SUB-TAB 3: WHY JOIN */}
       {activeTabSub === 'why_join' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1493,21 +1528,11 @@ ${url}`;
         </div>
       )}
 
-      {/* AI Social Media Auto-Poster Modal */}
-      <SocialMediaAutoPosterModal
-        isOpen={isSocialPosterOpen}
-        onClose={() => setIsSocialPosterOpen(false)}
-        initialListing={socialPosterListing}
-        initialOffice={socialPosterOffice}
-        initialCampaignType={socialCampaignType}
-      />
-
       {/* Company Showcase Modal */}
       <CompanyShowcaseModal
         isOpen={isPreviewOfficeOpen}
         onClose={() => setIsPreviewOfficeOpen(false)}
         office={previewOffice}
-        onOpenSocialPosterForOffice={(off) => handleLaunchPosterForOffice(off)}
       />
 
       {/* Family Live Tracking & Radar Modal */}

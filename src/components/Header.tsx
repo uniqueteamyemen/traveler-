@@ -31,15 +31,13 @@ interface HeaderProps {
   onOpenAuth?: () => void;
   onOpenRoadAlerts?: () => void;
   onOpenLiveTracking?: () => void;
-  onOpenSocialPoster?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
   onOpenNewTrip, 
   onOpenAuth, 
   onOpenRoadAlerts,
-  onOpenLiveTracking,
-  onOpenSocialPoster
+  onOpenLiveTracking
 }) => {
   const { 
     trips, 
@@ -164,18 +162,6 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
-            {/* Social Media Automator Button */}
-            {onOpenSocialPoster && (
-              <button
-                onClick={onOpenSocialPoster}
-                title={lang === 'ar' ? 'وحدة إنشاء المنشورات الدعائية المجانية' : 'Social Media Automator'}
-                className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition text-xs font-bold flex items-center gap-1.5 shadow-xs"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                <span className="hidden xl:inline text-[11px] font-black">{lang === 'ar' ? 'نشر دعائي 🎁' : 'Auto-Poster 🎁'}</span>
-              </button>
-            )}
-
             {/* Encrypted Family Live Tracking Button */}
             {onOpenLiveTracking && (
               <button

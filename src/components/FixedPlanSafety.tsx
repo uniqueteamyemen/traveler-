@@ -53,7 +53,10 @@ export const FixedPlanSafety: React.FC = () => {
   const completedStopsCount = stops.filter(s => s.isCompleted).length;
 
   const handleCopyTrackingLink = () => {
-    const link = `https://traveler-yemen.app/track?code=${trackingCode}&trip=${encodeURIComponent(activeTrip.titleAr || activeTrip.title)}`;
+    const origin = (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null')
+      ? window.location.origin
+      : 'https://deterministicsolutionsdesign.com';
+    const link = `${origin}/track?code=${trackingCode}&trip=${encodeURIComponent(activeTrip.titleAr || activeTrip.title)}`;
     navigator.clipboard.writeText(link);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
