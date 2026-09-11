@@ -22,9 +22,11 @@ import {
   Crown,
   Lock,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Share2
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { ShareLinksModal } from './modals/ShareLinksModal';
 
 interface HeaderProps {
   onOpenNewTrip: () => void;
@@ -35,7 +37,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ 
   onOpenNewTrip, 
-  onOpenAuth, 
+  onOpenAuth,
   onOpenRoadAlerts,
   onOpenLiveTracking
 }) => {
@@ -46,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveTripId, 
     activeTab, 
     setActiveTab, 
+    portalMode,
     lang, 
     toggleLang, 
     theme, 
@@ -58,11 +61,19 @@ export const Header: React.FC<HeaderProps> = ({
   } = useTravel();
 
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
+  const [isShareLinksOpen, setIsShareLinksOpen] = useState(false);
+
+  const isCaptainPortal = portalMode === 'captains';
+  const isPassengerPortal = portalMode === 'passenger';
+  const isAdmin = userProfile?.role === 'admin' || 
+    userProfile?.roles?.includes('admin') ||
+    currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
 
   const tabs: { id: TabType; labelEn: string; labelAr: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة', icon: Compass },
     { id: 'intercity_hub', labelEn: 'Intercity Trips', labelAr: 'سوق رحلات المحافظات', icon: Car, badge: '22 محافظة' },
-    { id: 'driver_portal', labelEn: 'Captains & Car Owners', labelAr: 'بوابة الكباتن وملاك السيارات 🚗', icon: Users },
+    { id: 'driver_portal', labelEn: 'Captains & Car Owners', labelAr: isCaptainPortal ? 'استمارة التسجيل وبوابة الكباتن 🚗' : 'بوابة الكباتن وملاك السيارات 🚗', icon: Users, badge: 'تسجيل 0% عمولة' },
     { id: 'fixed_plan', labelEn: 'Fixed Plan & Safety', labelAr: 'خطة السير وأمان العائلة', icon: ShieldCheck },
     { id: 'map', labelEn: 'Yemen Map', labelAr: 'خريطة اليمن والمسار', icon: MapPin },
     { id: 'itinerary', labelEn: 'Itinerary', labelAr: 'الجدول الزمني', icon: Calendar },
@@ -74,8 +85,34 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'stories', labelEn: 'Beginning of Story', labelAr: 'بداية القصة', icon: BookOpen },
   ];
 
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.roles?.includes('admin');
-  const visibleTabs = tabs.filter(tab => tab.id !== 'admin_control' || isAdmin);
+  let visibleTabs = tabs;
+  if (isCaptainPortal) {
+    // In Captain portal: ONLY the Captains and Registration tab is visible!
+    visibleTabs = tabs.filter(tab => tab.id === 'driver_portal');
+  } else if (isPassengerPortal) {
+    // In Passenger portal: ONLY Public Intercity Trips, Route Safety & Map!
+    visibleTabs = tabs.filter(tab => tab.id === 'intercity_hub' || tab.id === 'fixed_plan' || tab.id === 'map');
+  } else if (isAdmin) {
+    visibleTabs = tabs;
+  } else {
+    // Regular public visitor: Market, Captains Portal, Safety, Map.
+    visibleTabs = tabs.filter(tab => 
+      tab.id === 'intercity_hub' || 
+      tab.id === 'driver_portal' || 
+      tab.id === 'fixed_plan' || 
+      tab.id === 'map'
+    );
+  }
+
+  const getSubtitle = () => {
+    if (isCaptainPortal) {
+      return lang === 'ar' ? 'بوابة تسجيل الكباتن وملاك السيارات (عمولة 0%)' : 'Captains & Car Owners Registration Portal';
+    }
+    if (isPassengerPortal) {
+      return lang === 'ar' ? 'سوق وحجز رحلات الـ 22 محافظة يمنية' : 'Intercity Travel & Booking Marketplace';
+    }
+    return lang === 'ar' ? 'سوق النقل بين المحافظات وبداية القصة' : 'Inter-Governorate Travel & Safety';
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-stone-50/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 transition-colors shadow-xs">
@@ -98,65 +135,68 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-stone-600 dark:text-stone-300 font-medium">
-                  {lang === 'ar' ? 'سوق النقل بين المحافظات وبداية القصة' : 'Inter-Governorate Travel & Safety'}
+                  {getSubtitle()}
                 </p>
               </div>
             </div>
 
-            <div className="hidden lg:block h-6 w-px bg-stone-300 dark:bg-stone-700 mx-2" />
+            {/* Trip Dropdown (Admin / Full mode only) */}
+            {!isCaptainPortal && !isPassengerPortal && isAdmin && (
+              <>
+                <div className="hidden lg:block h-6 w-px bg-stone-300 dark:bg-stone-700 mx-2" />
+                <div className="relative hidden md:block">
+                  <button
+                    onClick={() => setTripDropdownOpen(!tripDropdownOpen)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-xs font-semibold text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition shadow-xs"
+                  >
+                    <span className="max-w-[160px] truncate">
+                      {lang === 'ar' ? (activeTrip?.titleAr || activeTrip?.title) : activeTrip?.title}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                  </button>
 
-            {/* Trip Dropdown */}
-            <div className="relative hidden md:block">
-              <button
-                onClick={() => setTripDropdownOpen(!tripDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-xs font-semibold text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700/60 transition shadow-xs"
-              >
-                <span className="max-w-[160px] truncate">
-                  {lang === 'ar' ? (activeTrip?.titleAr || activeTrip?.title) : activeTrip?.title}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
-              </button>
-
-              {tripDropdownOpen && (
-                <div 
-                  className="absolute start-0 mt-2 w-72 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
-                  onMouseLeave={() => setTripDropdownOpen(false)}
-                >
-                  <div className="px-3 py-1.5 text-[11px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                    {lang === 'ar' ? 'رحلاتك المجدولة' : 'Your Planned Journeys'}
-                  </div>
-                  {trips.map(trip => (
-                    <button
-                      key={trip.id}
-                      onClick={() => {
-                        setActiveTripId(trip.id);
-                        setTripDropdownOpen(false);
-                      }}
-                      className={`w-full text-start px-3 py-2 text-xs flex items-center justify-between transition ${
-                        trip.id === activeTripId 
-                          ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 font-semibold' 
-                          : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/50'
-                      }`}
+                  {tripDropdownOpen && (
+                    <div 
+                      className="absolute start-0 mt-2 w-72 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      onMouseLeave={() => setTripDropdownOpen(false)}
                     >
-                      <span className="truncate">{lang === 'ar' ? (trip.titleAr || trip.title) : trip.title}</span>
-                      <span className="text-[10px] text-amber-700 dark:text-amber-400 shrink-0 ms-2">{trip.originGovernorate ? `${trip.originGovernorate} ${lang === 'ar' ? '←' : '➔'} ${trip.destinationGovernorate}` : trip.destination}</span>
-                    </button>
-                  ))}
-                  <div className="border-t border-stone-100 dark:border-stone-700 mt-1 pt-1">
-                    <button
-                      onClick={() => {
-                        setTripDropdownOpen(false);
-                        onOpenNewTrip();
-                      }}
-                      className="w-full text-start px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{lang === 'ar' ? '+ إضافة خط رحلة جديدة' : '+ Plan New Route'}</span>
-                    </button>
-                  </div>
+                      <div className="px-3 py-1.5 text-[11px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                        {lang === 'ar' ? 'رحلاتك المجدولة' : 'Your Planned Journeys'}
+                      </div>
+                      {trips.map(trip => (
+                        <button
+                          key={trip.id}
+                          onClick={() => {
+                            setActiveTripId(trip.id);
+                            setTripDropdownOpen(false);
+                          }}
+                          className={`w-full text-start px-3 py-2 text-xs flex items-center justify-between transition ${
+                            trip.id === activeTripId 
+                              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 font-semibold' 
+                              : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/50'
+                          }`}
+                        >
+                          <span className="truncate">{lang === 'ar' ? (trip.titleAr || trip.title) : trip.title}</span>
+                          <span className="text-[10px] text-amber-700 dark:text-amber-400 shrink-0 ms-2">{trip.originGovernorate ? `${trip.originGovernorate} ${lang === 'ar' ? '←' : '➔'} ${trip.destinationGovernorate}` : trip.destination}</span>
+                        </button>
+                      ))}
+                      <div className="border-t border-stone-100 dark:border-stone-700 mt-1 pt-1">
+                        <button
+                          onClick={() => {
+                            setTripDropdownOpen(false);
+                            onOpenNewTrip();
+                          }}
+                          className="w-full text-start px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{lang === 'ar' ? '+ إضافة خط رحلة جديدة' : '+ Plan New Route'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {/* Right Action Controls */}
@@ -199,6 +239,16 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
+            {/* Share Portal Links Button */}
+            <button
+              onClick={() => setIsShareLinksOpen(true)}
+              title={lang === 'ar' ? 'روابط المنصة المباشرة (كباتن / ركاب / إدارة)' : 'Official Portal Deep Links'}
+              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition text-xs font-bold flex items-center gap-1.5 shadow-xs"
+            >
+              <Share2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="hidden sm:inline text-[11px] font-extrabold">{lang === 'ar' ? 'روابط التسجيل 🔗' : 'Links 🔗'}</span>
+            </button>
+
             {/* Real-time Notification Bell */}
             <NotificationBell />
 
@@ -224,13 +274,15 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <button
-              onClick={onOpenNewTrip}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{lang === 'ar' ? 'تخطيط رحلة' : 'New Journey'}</span>
-            </button>
+            {!isCaptainPortal && !isPassengerPortal && isAdmin && (
+              <button
+                onClick={onOpenNewTrip}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{lang === 'ar' ? 'تخطيط رحلة' : 'New Journey'}</span>
+              </button>
+            )}
 
             {/* Language Switch */}
             <button
@@ -283,6 +335,11 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
       </div>
+
+      <ShareLinksModal 
+        isOpen={isShareLinksOpen} 
+        onClose={() => setIsShareLinksOpen(false)} 
+      />
     </header>
   );
 };

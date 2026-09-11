@@ -55,7 +55,7 @@ export const FixedPlanSafety: React.FC = () => {
   const handleCopyTrackingLink = () => {
     const origin = (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null')
       ? window.location.origin
-      : 'https://deterministicsolutionsdesign.com';
+      : 'https://traveler.deterministicsolutionsdesign.com';
     const link = `${origin}/track?code=${trackingCode}&trip=${encodeURIComponent(activeTrip.titleAr || activeTrip.title)}`;
     navigator.clipboard.writeText(link);
     setCopiedCode(true);

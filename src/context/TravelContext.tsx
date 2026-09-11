@@ -23,7 +23,8 @@ import {
   TripLifecycleStatus,
   TripConflictNotice,
   AppChatMessage,
-  FAQItem
+  FAQItem,
+  PortalMode
 } from '../types/travel';
 import { loadTrips, saveTrips, getSavedActiveTripId, saveActiveTripId, getSavedLanguage, saveLanguage, getSavedTheme, saveTheme } from '../utils/storage';
 import { INITIAL_INTERCITY_TRIPS } from '../data/yemenData';
@@ -43,7 +44,7 @@ import {
 } from '../services/firebaseService';
 import { FirebaseUser } from '../lib/firebase';
 
-export type { TabType };
+export type { TabType, PortalMode };
 
 interface TravelContextType {
   trips: Trip[];
@@ -52,6 +53,8 @@ interface TravelContextType {
   setActiveTripId: (id: string) => void;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+  portalMode: PortalMode;
+  setPortalMode: (mode: PortalMode) => void;
   lang: 'ar' | 'en';
   isRTL: boolean;
   setLang: (lang: 'ar' | 'en') => void;
@@ -329,9 +332,50 @@ const INITIAL_CHAT_MESSAGES: AppChatMessage[] = [
 ];
 
 export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const getInitialPortalMode = (): PortalMode => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const portal = (params.get('portal') || params.get('role') || '').toLowerCase();
+      const hash = (window.location.hash || '').toLowerCase();
+      if (
+        portal === 'captains' || 
+        portal === 'captain' || 
+        portal === 'driver' || 
+        portal === 'owners' || 
+        portal === 'register-captain' || 
+        params.get('register') === 'captain' || 
+        hash === '#captain' || 
+        hash === '#driver'
+      ) {
+        return 'captains';
+      }
+      if (
+        portal === 'passenger' || 
+        portal === 'passengers' || 
+        portal === 'traveler' || 
+        portal === 'trips' || 
+        hash === '#trips' || 
+        hash === '#passenger'
+      ) {
+        return 'passenger';
+      }
+      if (portal === 'admin') {
+        return 'admin';
+      }
+    }
+    return 'all';
+  };
+
+  const [portalMode, setPortalMode] = useState<PortalMode>(getInitialPortalMode);
   const [trips, setTrips] = useState<Trip[]>(loadTrips);
   const [activeTripId, setActiveTripIdState] = useState<string>(getSavedActiveTripId);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const mode = getInitialPortalMode();
+    if (mode === 'captains') return 'driver_portal';
+    if (mode === 'passenger') return 'intercity_hub';
+    if (mode === 'admin') return 'admin_control';
+    return 'overview';
+  });
   const [lang, setLangState] = useState<'ar' | 'en'>(getSavedLanguage);
   const [theme, setThemeState] = useState<'light' | 'dark'>(getSavedTheme);
 
@@ -1792,6 +1836,8 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setActiveTripId,
         activeTab,
         setActiveTab,
+        portalMode,
+        setPortalMode,
         lang,
         isRTL,
         setLang,

@@ -1,5 +1,7 @@
 export type CurrencyCode = 'YER' | 'SAR' | 'USD' | 'AED' | 'EUR' | 'GBP';
 
+export type PortalMode = 'all' | 'captains' | 'passenger' | 'admin';
+
 export type TabType = 
   | 'overview' 
   | 'intercity_hub' // سوق وحجز الرحلات بين المحافظات الـ 22

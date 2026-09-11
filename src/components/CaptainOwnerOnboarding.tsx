@@ -64,7 +64,7 @@ export const CaptainOwnerOnboarding: React.FC<CaptainOwnerOnboardingProps> = ({ 
   ];
 
   const handleCopyPortalLink = () => {
-    const portalUrl = `${window.location.origin}${window.location.pathname}#driver`;
+    const portalUrl = 'https://traveler.deterministicsolutionsdesign.com/?portal=captains';
     navigator.clipboard.writeText(portalUrl).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);

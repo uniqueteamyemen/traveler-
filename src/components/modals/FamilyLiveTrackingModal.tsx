@@ -159,7 +159,7 @@ export const FamilyLiveTrackingModal: React.FC<FamilyLiveTrackingModalProps> = (
   const getLiveTrackUrl = () => {
     const origin = (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null')
       ? window.location.origin
-      : 'https://deterministicsolutionsdesign.com';
+      : 'https://traveler.deterministicsolutionsdesign.com';
     return `${origin}/live-track?code=${encodeURIComponent(currentCode)}`;
   };
 

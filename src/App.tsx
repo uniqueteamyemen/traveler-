@@ -28,22 +28,52 @@ import { InAppSupportChatModal } from './components/modals/InAppSupportChatModal
 import { MessageSquare } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { activeTab, activeTrip, lang, setIsChatOpen, chatMessages, setActiveTab } = useTravel();
+  const { 
+    activeTab, 
+    activeTrip, 
+    lang, 
+    setIsChatOpen, 
+    chatMessages, 
+    setActiveTab,
+    portalMode,
+    setPortalMode
+  } = useTravel();
 
   // Handle URL Deep-Linking: ?portal=captains or ?portal=passenger or hashes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const portal = params.get('portal') || params.get('role');
+      const portal = (params.get('portal') || params.get('role') || '').toLowerCase();
       const hash = (window.location.hash || '').toLowerCase();
 
-      if (portal === 'captains' || portal === 'captain' || portal === 'driver' || portal === 'owners' || hash === '#captain') {
+      if (
+        portal === 'captains' || 
+        portal === 'captain' || 
+        portal === 'driver' || 
+        portal === 'owners' || 
+        portal === 'register-captain' || 
+        params.get('register') === 'captain' || 
+        hash === '#captain' || 
+        hash === '#driver'
+      ) {
+        setPortalMode('captains');
         setActiveTab('driver_portal');
-      } else if (portal === 'passenger' || portal === 'traveler' || portal === 'trips' || hash === '#trips') {
+      } else if (
+        portal === 'passenger' || 
+        portal === 'passengers' || 
+        portal === 'traveler' || 
+        portal === 'trips' || 
+        hash === '#trips' || 
+        hash === '#passenger'
+      ) {
+        setPortalMode('passenger');
         setActiveTab('intercity_hub');
+      } else if (portal === 'admin') {
+        setPortalMode('admin');
+        setActiveTab('admin_control');
       }
     }
-  }, [setActiveTab]);
+  }, [setActiveTab, setPortalMode]);
 
   // Modals state
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);

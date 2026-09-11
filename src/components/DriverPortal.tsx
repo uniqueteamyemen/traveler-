@@ -52,8 +52,15 @@ export const DriverPortal: React.FC = () => {
     addFleetVehicleToOffice,
     addNotification,
     userProfile,
-    driverVehicles
+    driverVehicles,
+    portalMode,
+    currentUser
   } = useTravel();
+
+  const isAdmin = userProfile?.role === 'admin' || 
+    userProfile?.roles?.includes('admin') ||
+    currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
 
   const isProfileComplete = Boolean(
     userProfile?.isProfileComplete && 
@@ -87,14 +94,14 @@ export const DriverPortal: React.FC = () => {
     if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}/?portal=captains`;
     }
-    return 'https://deterministicsolutionsdesign.com/?portal=captains';
+    return 'https://traveler.deterministicsolutionsdesign.com/?portal=captains';
   };
 
   const getPassengerInviteUrl = () => {
     if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}/?portal=passenger`;
     }
-    return 'https://deterministicsolutionsdesign.com/?portal=passenger';
+    return 'https://traveler.deterministicsolutionsdesign.com/?portal=passenger';
   };
 
   const handleCopyCaptainLink = () => {
@@ -526,11 +533,11 @@ ${url}`;
               : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100'
           }`}
         >
-          <Car className="w-4 h-4" />
-          <span>{lang === 'ar' ? '🚗 بوابة الكابتن والمالك' : 'Captain & Owner Hub'}</span>
+          <Users className="w-4 h-4" />
+          <span>{lang === 'ar' ? (!isProfileComplete ? '📋 استمارة تسجيل الكابتن والمركبة' : '🚗 بوابة الكابتن والمالك') : (isProfileComplete ? 'Captain & Owner Hub' : 'Registration Form')}</span>
           {!isProfileComplete && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500 text-white font-bold">
-              إكمال التسجيل
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-bold animate-pulse">
+              {lang === 'ar' ? 'سجّل الآن مجاناً 0% عمولة' : 'Register 0% Fee'}
             </span>
           )}
         </button>
@@ -574,20 +581,22 @@ ${url}`;
           <span>{lang === 'ar' ? 'فتح رحلة مفصلة' : 'Post Detailed Trip'}</span>
         </button>
 
-        <button
-          onClick={() => setActiveTabSub('offices_mgmt')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-            activeTabSub === 'offices_mgmt'
-              ? 'bg-amber-600 text-white shadow-md'
-              : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>{lang === 'ar' ? '🏢 مكاتب النقل والأسطول' : 'Office & Fleet Manager'}</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/30 text-white font-bold">
-            {transportOffices.length}
-          </span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTabSub('offices_mgmt')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+              activeTabSub === 'offices_mgmt'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{lang === 'ar' ? '🏢 مكاتب النقل والأسطول' : 'Office & Fleet Manager'}</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/30 text-white font-bold">
+              {transportOffices.length}
+            </span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTabSub('live_broadcast')}
