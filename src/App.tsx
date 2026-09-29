@@ -46,15 +46,23 @@ const AppContent: React.FC = () => {
       const portal = (params.get('portal') || params.get('role') || '').toLowerCase();
       const hash = (window.location.hash || '').toLowerCase();
 
+      const register = (params.get('register') || params.get('mode') || '').toLowerCase();
+
       if (
         portal === 'captains' || 
         portal === 'captain' || 
         portal === 'driver' || 
+        portal === 'drivers' || 
         portal === 'owners' || 
+        portal === 'owner' || 
         portal === 'register-captain' || 
-        params.get('register') === 'captain' || 
+        register === 'captain' || 
+        register === 'driver' || 
+        register === 'captains' || 
         hash === '#captain' || 
-        hash === '#driver'
+        hash === '#captains' || 
+        hash === '#driver' || 
+        hash === '#register-captain'
       ) {
         setPortalMode('captains');
         setActiveTab('driver_portal');

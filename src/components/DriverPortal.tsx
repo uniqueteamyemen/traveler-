@@ -380,6 +380,16 @@ ${url}`;
     setNewVehiclePlate('');
   };
 
+  // If driver/captain profile is not yet complete, present the clean, dedicated registration form directly!
+  // This guarantees that any captain opening the direct invite link enters the onboarding form immediately.
+  if (!isProfileComplete) {
+    return (
+      <div className="py-2 animate-in fade-in duration-300 max-w-4xl mx-auto">
+        <CaptainOwnerOnboarding onSuccess={() => setActiveTabSub('dashboard')} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
@@ -534,12 +544,7 @@ ${url}`;
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>{lang === 'ar' ? (!isProfileComplete ? '📋 استمارة تسجيل الكابتن والمركبة' : '🚗 بوابة الكابتن والمالك') : (isProfileComplete ? 'Captain & Owner Hub' : 'Registration Form')}</span>
-          {!isProfileComplete && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-bold animate-pulse">
-              {lang === 'ar' ? 'سجّل الآن مجاناً 0% عمولة' : 'Register 0% Fee'}
-            </span>
-          )}
+          <span>{lang === 'ar' ? '🚗 لوحة تحكم الكابتن' : 'Captain & Owner Dashboard'}</span>
         </button>
 
         <button
@@ -638,15 +643,9 @@ ${url}`;
         </button>
       </div>
 
-      {/* SUB-TAB: CAPTAIN & OWNER DASHBOARD / ONBOARDING */}
+      {/* SUB-TAB: CAPTAIN & OWNER DASHBOARD */}
       {activeTabSub === 'dashboard' && (
-        <div>
-          {!isProfileComplete ? (
-            <CaptainOwnerOnboarding onSuccess={() => setActiveTabSub('dashboard')} />
-          ) : (
-            <CaptainOwnerDashboard onOpenSMSPortal={() => setActiveTabSub('sms_portal')} />
-          )}
-        </div>
+        <CaptainOwnerDashboard onOpenSMSPortal={() => setActiveTabSub('sms_portal')} />
       )}
 
       {/* SUB-TAB: GARAGE MANAGER */}

@@ -49,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
     activeTab, 
     setActiveTab, 
     portalMode,
+    setPortalMode,
     lang, 
     toggleLang, 
     theme, 
@@ -106,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getSubtitle = () => {
     if (isCaptainPortal) {
-      return lang === 'ar' ? 'بوابة تسجيل الكباتن وملاك السيارات (عمولة 0%)' : 'Captains & Car Owners Registration Portal';
+      return lang === 'ar' ? 'استمارة وبوابة تسجيل الكباتن وملاك السيارات (عمولة 0% وتسجيل مجاني)' : 'Captains & Car Owners Registration Portal (0% Fee)';
     }
     if (isPassengerPortal) {
       return lang === 'ar' ? 'سوق وحجز رحلات الـ 22 محافظة يمنية' : 'Intercity Travel & Booking Marketplace';
@@ -202,8 +203,23 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
+            {/* Switch to Passenger Marketplace Button (if in Captain Portal) */}
+            {isCaptainPortal && (
+              <button
+                onClick={() => {
+                  setPortalMode('passenger');
+                  setActiveTab('intercity_hub');
+                }}
+                title={lang === 'ar' ? 'الانتقال إلى سوق رحلات المسافرين' : 'Browse Passenger Trips'}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+              >
+                <Car className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-[11px] font-bold">{lang === 'ar' ? 'سوق رحلات المسافرين 🚗' : 'Passenger Trips'}</span>
+              </button>
+            )}
+
             {/* Encrypted Family Live Tracking Button */}
-            {onOpenLiveTracking && (
+            {!isCaptainPortal && onOpenLiveTracking && (
               <button
                 onClick={onOpenLiveTracking}
                 title={lang === 'ar' ? 'تتبع رحلة عائلتك بالكود المشفر' : 'Encrypted Family Live Tracking'}
@@ -215,7 +231,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Road Passes & Mountain Radar Button */}
-            {onOpenRoadAlerts && (
+            {!isCaptainPortal && onOpenRoadAlerts && (
               <button
                 onClick={onOpenRoadAlerts}
                 title={lang === 'ar' ? 'رادار حالة الطرق والعقبات الجبلية المباشر' : 'Live Highway Radar'}
@@ -240,14 +256,16 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Share Portal Links Button */}
-            <button
-              onClick={() => setIsShareLinksOpen(true)}
-              title={lang === 'ar' ? 'روابط المنصة المباشرة (كباتن / ركاب / إدارة)' : 'Official Portal Deep Links'}
-              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition text-xs font-bold flex items-center gap-1.5 shadow-xs"
-            >
-              <Share2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline text-[11px] font-extrabold">{lang === 'ar' ? 'روابط التسجيل 🔗' : 'Links 🔗'}</span>
-            </button>
+            {!isCaptainPortal && (
+              <button
+                onClick={() => setIsShareLinksOpen(true)}
+                title={lang === 'ar' ? 'روابط المنصة المباشرة (كباتن / ركاب / إدارة)' : 'Official Portal Deep Links'}
+                className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition text-xs font-bold flex items-center gap-1.5 shadow-xs"
+              >
+                <Share2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span className="hidden sm:inline text-[11px] font-extrabold">{lang === 'ar' ? 'روابط التسجيل 🔗' : 'Links 🔗'}</span>
+              </button>
+            )}
 
             {/* Real-time Notification Bell */}
             <NotificationBell />
@@ -305,34 +323,36 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs Bar */}
-        <nav className="flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar scroll-smooth">
-          {visibleTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition shrink-0 ${
-                  isActive
-                    ? 'bg-amber-600 text-white font-bold shadow-xs'
-                    : 'text-stone-700 dark:text-stone-300 bg-stone-100/70 dark:bg-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-700 border border-transparent'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-stone-600 dark:text-stone-300'}`} />
-                <span>{lang === 'ar' ? tab.labelAr : tab.labelEn}</span>
-                {tab.badge && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isActive ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Navigation Tabs Bar - Hidden when in direct Captain Registration Portal */}
+        {!isCaptainPortal && (
+          <nav className="flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar scroll-smooth">
+            {visibleTabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition shrink-0 ${
+                    isActive
+                      ? 'bg-amber-600 text-white font-bold shadow-xs'
+                      : 'text-stone-700 dark:text-stone-300 bg-stone-100/70 dark:bg-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-700 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-stone-600 dark:text-stone-300'}`} />
+                  <span>{lang === 'ar' ? tab.labelAr : tab.labelEn}</span>
+                  {tab.badge && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isActive ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
       </div>
 
