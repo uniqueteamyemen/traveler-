@@ -69,17 +69,18 @@ export const Header: React.FC<HeaderProps> = ({
   const isAdmin = userProfile?.role === 'admin' || 
     userProfile?.roles?.includes('admin') ||
     currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
-    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com' ||
+    portalMode === 'admin';
 
   const tabs: { id: TabType; labelEn: string; labelAr: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة', icon: Compass },
     { id: 'intercity_hub', labelEn: 'Intercity Trips', labelAr: 'سوق رحلات المحافظات', icon: Car, badge: '22 محافظة' },
     { id: 'driver_portal', labelEn: 'Captains & Car Owners', labelAr: isCaptainPortal ? 'استمارة التسجيل وبوابة الكباتن 🚗' : 'بوابة الكباتن وملاك السيارات 🚗', icon: Users, badge: 'تسجيل 0% عمولة' },
+    { id: 'admin_control', labelEn: 'Admin Control', labelAr: 'لوحة الإدارة والاشتراكات', icon: Crown, badge: 'Super Admin' },
     { id: 'fixed_plan', labelEn: 'Fixed Plan & Safety', labelAr: 'خطة السير وأمان العائلة', icon: ShieldCheck },
     { id: 'map', labelEn: 'Yemen Map', labelAr: 'خريطة اليمن والمسار', icon: MapPin },
     { id: 'itinerary', labelEn: 'Itinerary', labelAr: 'الجدول الزمني', icon: Calendar },
     { id: 'bookings', labelEn: 'Bookings', labelAr: 'الحجوزات والتذاكر', icon: Ticket },
-    { id: 'admin_control', labelEn: 'Admin Control', labelAr: 'لوحة الإدارة والاشتراكات', icon: Crown, badge: 'Super Admin' },
     { id: 'expenses', labelEn: 'Budget & Split', labelAr: 'المصاريف والقطة', icon: DollarSign },
     { id: 'documents', labelEn: 'Documents', labelAr: 'خزينة الوثائق', icon: FileText },
     { id: 'packing', labelEn: 'Packing List', labelAr: 'حقيبة السفر', icon: Luggage },
@@ -91,15 +92,16 @@ export const Header: React.FC<HeaderProps> = ({
     // In Captain portal: ONLY the Captains and Registration tab is visible!
     visibleTabs = tabs.filter(tab => tab.id === 'driver_portal');
   } else if (isPassengerPortal) {
-    // In Passenger portal: ONLY Public Intercity Trips, Route Safety & Map!
+    // In Passenger portal: Public Intercity Trips, Route Safety & Map
     visibleTabs = tabs.filter(tab => tab.id === 'intercity_hub' || tab.id === 'fixed_plan' || tab.id === 'map');
   } else if (isAdmin) {
     visibleTabs = tabs;
   } else {
-    // Regular public visitor: Market, Captains Portal, Safety, Map.
+    // Regular public visitor: Market, Captains Portal, Safety, Map, and Admin Entry
     visibleTabs = tabs.filter(tab => 
       tab.id === 'intercity_hub' || 
       tab.id === 'driver_portal' || 
+      tab.id === 'admin_control' ||
       tab.id === 'fixed_plan' || 
       tab.id === 'map'
     );
@@ -266,6 +268,22 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden sm:inline text-[11px] font-extrabold">{lang === 'ar' ? 'روابط التسجيل 🔗' : 'Links 🔗'}</span>
               </button>
             )}
+
+            {/* Quick Admin Control Link */}
+            <button
+              onClick={() => {
+                setActiveTab('admin_control');
+              }}
+              title={lang === 'ar' ? 'لوحة تحكم المشرف والإدارة المركزية' : 'Admin Control Portal'}
+              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition shadow-xs ${
+                activeTab === 'admin_control'
+                  ? 'bg-amber-500 text-stone-950 border-amber-400 font-black shadow-md'
+                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="hidden xl:inline text-[11px] font-extrabold">{lang === 'ar' ? 'لوحة المشرف 👑' : 'Admin 👑'}</span>
+            </button>
 
             {/* Real-time Notification Bell */}
             <NotificationBell />
