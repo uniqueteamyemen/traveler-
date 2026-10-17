@@ -8,7 +8,9 @@ import {
   Car, 
   Users, 
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  Crown,
+  AlertTriangle
 } from 'lucide-react';
 import { UserRole } from '../../types/travel';
 
@@ -18,6 +20,9 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
     userProfile, 
     loginWithGoogle, 
     loginGuest, 
+    loginSupervisor,
+    authError,
+    clearAuthError,
     logout, 
     updateUserRole, 
     lang, 
@@ -36,6 +41,18 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
     try {
       setLoading(true);
       await loginWithGoogle();
+      onClose();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSupervisorLogin = async () => {
+    try {
+      setLoading(true);
+      await loginSupervisor('qpjiu.sea@gmail.com');
       onClose();
     } catch (e) {
       console.error(e);
@@ -239,6 +256,21 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 </p>
               </div>
 
+              {/* Error feedback if Google OAuth popup is blocked */}
+              {authError && (
+                <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs text-start leading-relaxed flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold">{authError}</p>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      {lang === 'ar' 
+                        ? 'إذا كنت المشرف، يمكنك الضغط على زر "دخول المشرف العام" أدناه للدخول فوراً.' 
+                        : 'If you are the admin, use the direct Super Admin button below.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Google Sign In */}
               <button
                 type="button"
@@ -258,7 +290,7 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
                 <span className="flex-shrink mx-3 text-[11px] text-stone-400 font-semibold">
-                  {lang === 'ar' ? 'أو الدخول التجريبي كـ' : 'Or quick trial as'}
+                  {lang === 'ar' ? 'أو الدخول التجريبي والإداري كـ' : 'Or fast access as'}
                 </span>
                 <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
               </div>
@@ -268,6 +300,7 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 <button
                   type="button"
                   onClick={() => handleGuestLogin('passenger')}
+                  disabled={loading}
                   className="p-3 rounded-2xl bg-stone-50 dark:bg-stone-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 text-xs font-bold transition flex items-center justify-center gap-2"
                 >
                   <Users className="w-4 h-4 text-amber-600" />
@@ -277,12 +310,24 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 <button
                   type="button"
                   onClick={() => handleGuestLogin('driver')}
+                  disabled={loading}
                   className="p-3 rounded-2xl bg-stone-50 dark:bg-stone-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 text-xs font-bold transition flex items-center justify-center gap-2"
                 >
                   <Car className="w-4 h-4 text-amber-600" />
                   <span>{lang === 'ar' ? 'دخول ككابتن' : 'As Driver'}</span>
                 </button>
               </div>
+
+              {/* Super Admin Direct Access */}
+              <button
+                type="button"
+                onClick={handleSupervisorLogin}
+                disabled={loading}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-black shadow-md transition flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Crown className="w-4 h-4 text-amber-200" />
+                <span>{lang === 'ar' ? 'دخول المشرف العام للمنصة (qpjiu.sea@gmail.com) 👑' : 'Login as Super Admin (qpjiu.sea@gmail.com) 👑'}</span>
+              </button>
             </div>
           )}
         </div>

@@ -25,7 +25,9 @@ export const ShareLinksModal: React.FC<ShareLinksModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  const domain = 'https://traveler.deterministicsolutionsdesign.com';
+  const domain = typeof window !== 'undefined' && window.location.origin 
+    ? window.location.origin 
+    : 'https://traveler.deterministicsolutionsdesign.com';
 
   const links = [
     {
