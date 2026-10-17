@@ -10,7 +10,9 @@ import {
   Building2,
   CheckCircle2,
   Crown,
-  AlertTriangle
+  AlertTriangle,
+  Key,
+  Lock
 } from 'lucide-react';
 import { UserRole } from '../../types/travel';
 
@@ -35,6 +37,10 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
   const [governorate, setGovernorate] = useState(userProfile?.governorate || 'عدن');
   const [loading, setLoading] = useState(false);
 
+  const [showAdminPinInput, setShowAdminPinInput] = useState(false);
+  const [modalPinInput, setModalPinInput] = useState('');
+  const [modalPinError, setModalPinError] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const handleGoogleLogin = async () => {
@@ -49,13 +55,19 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
     }
   };
 
-  const handleSupervisorLogin = async () => {
+  const handleSupervisorLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!modalPinInput.trim()) {
+      setModalPinError(lang === 'ar' ? 'يرجى كتابة رمز المشرف السري (PIN)' : 'Please enter admin PIN');
+      return;
+    }
     try {
       setLoading(true);
-      await loginSupervisor('qpjiu.sea@gmail.com');
+      setModalPinError(null);
+      await loginSupervisor('qpjiu.sea@gmail.com', modalPinInput.trim());
       onClose();
-    } catch (e) {
-      console.error(e);
+    } catch (err: any) {
+      setModalPinError(err?.message || (lang === 'ar' ? 'رمز المشرف السري غير صحيح!' : 'Invalid admin PIN'));
     } finally {
       setLoading(false);
     }
@@ -318,16 +330,65 @@ export const AuthControlModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 </button>
               </div>
 
-              {/* Super Admin Direct Access */}
-              <button
-                type="button"
-                onClick={handleSupervisorLogin}
-                disabled={loading}
-                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-black shadow-md transition flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Crown className="w-4 h-4 text-amber-200" />
-                <span>{lang === 'ar' ? 'دخول المشرف العام للمنصة (qpjiu.sea@gmail.com) 👑' : 'Login as Super Admin (qpjiu.sea@gmail.com) 👑'}</span>
-              </button>
+              {/* Super Admin PIN-Protected Access */}
+              <div className="pt-2 border-t border-stone-200 dark:border-stone-800">
+                {!showAdminPinInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdminPinInput(true);
+                      setModalPinError(null);
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>{lang === 'ar' ? 'دخول المشرف العام برمز الحماية (PIN) 👑' : 'Login as Super Admin (PIN Required) 👑'}</span>
+                  </button>
+                ) : (
+                  <form onSubmit={handleSupervisorLogin} className="space-y-2 p-3 rounded-2xl bg-amber-50/50 dark:bg-stone-800/80 border border-amber-300 dark:border-amber-700">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 dark:text-amber-300">
+                      <span className="flex items-center gap-1">
+                        <Key className="w-3.5 h-3.5" />
+                        <span>{lang === 'ar' ? 'رمز المشرف السري (الافتراضي 2026):' : 'Admin Master PIN (Default: 2026):'}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPinInput(false)}
+                        className="text-stone-400 hover:text-stone-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {modalPinError && (
+                      <p className="text-[10px] text-red-600 font-bold bg-red-50 dark:bg-red-950/40 p-1.5 rounded-lg border border-red-200 dark:border-red-800">
+                        {modalPinError}
+                      </p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={modalPinInput}
+                        onChange={e => {
+                          setModalPinInput(e.target.value);
+                          setModalPinError(null);
+                        }}
+                        placeholder="••••"
+                        autoFocus
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-center font-mono tracking-widest text-xs text-stone-900 dark:text-white outline-none focus:border-amber-500"
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition"
+                      >
+                        {loading ? '...' : (lang === 'ar' ? 'تأكيد' : 'Confirm')}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
         </div>

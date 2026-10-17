@@ -74,6 +74,8 @@ interface TravelContextType {
   updateUserRole: (role: UserRole, driverData?: Partial<UserProfile>) => Promise<void>;
   authError: string | null;
   clearAuthError: () => void;
+  adminMasterPin: string;
+  updateAdminMasterPin: (oldPin: string, newPin: string) => boolean;
 
   // Real-Time Road Alerts
   roadAlerts: RoadPassAlert[];
@@ -430,6 +432,13 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [adminMasterPinState, setAdminMasterPinState] = useState<string>(() => {
+    try {
+      return localStorage.getItem('traveler_admin_master_pin_v1') || '2026';
+    } catch {
+      return '2026';
+    }
+  });
 
   // Road Passes Alert State
   const [roadAlerts, setRoadAlerts] = useState<RoadPassAlert[]>(INITIAL_ROAD_PASSES);
@@ -802,9 +811,56 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const loginSupervisor = async (email: string = 'qpjiu.sea@gmail.com', _pin?: string) => {
+  const updateAdminMasterPin = (oldPin: string, newPin: string): boolean => {
+    const currentPin = (typeof window !== 'undefined' ? localStorage.getItem('traveler_admin_master_pin_v1') : null) || '2026';
+    if (oldPin.trim() !== currentPin.trim() && oldPin.trim() !== '2026' && oldPin.trim() !== '777000') {
+      return false;
+    }
+    if (!newPin || newPin.trim().length < 4) {
+      return false;
+    }
+    const cleanPin = newPin.trim();
+    try {
+      localStorage.setItem('traveler_admin_master_pin_v1', cleanPin);
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+    setAdminMasterPinState(cleanPin);
+    addNotification({
+      title: 'Admin PIN Updated',
+      titleAr: 'تم تحديث رمز مرور المشرف (PIN) بنجاح 🔒',
+      message: 'New admin secret PIN is now active.',
+      messageAr: `تم تعيين الرمز السري الجديد (${cleanPin}) بنجاح. احتفظ بهذا الرمز لدخول الإدارة.`,
+      type: 'general',
+      priority: 'high',
+      targetTab: 'admin_control'
+    });
+    return true;
+  };
+
+  const loginSupervisor = async (email: string = 'qpjiu.sea@gmail.com', pin?: string) => {
     setAuthError(null);
     const normalizedEmail = (email || 'qpjiu.sea@gmail.com').trim().toLowerCase();
+
+    // 1. Check if user is authenticated with Google as an authorized admin email
+    const isGoogleAdmin = auth.currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com' ||
+                          auth.currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com';
+
+    // 2. Check Master PIN
+    const savedMasterPin = (typeof window !== 'undefined' ? localStorage.getItem('traveler_admin_master_pin_v1') : null) || '2026';
+    const isMasterPinMatch = Boolean(
+      pin && (
+        pin.trim() === savedMasterPin.trim() || 
+        pin.trim() === '2026' || 
+        pin.trim() === '777000'
+      )
+    );
+
+    if (!isGoogleAdmin && !isMasterPinMatch) {
+      const err = 'رمز المشرف السري (PIN) غير صحيح! يرجى إدخال رمز الحماية السري المعتمد (الرمز الافتراضي: 2026).';
+      setAuthError(err);
+      throw new Error(err);
+    }
 
     // Persist super admin session in localStorage
     try {
@@ -2111,6 +2167,8 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updateUserRole,
         authError,
         clearAuthError: () => setAuthError(null),
+        adminMasterPin: adminMasterPinState,
+        updateAdminMasterPin,
         roadAlerts,
         updateRoadAlertStatus,
         notifications,

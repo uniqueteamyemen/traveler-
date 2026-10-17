@@ -46,7 +46,10 @@ import {
   Clock,
   ArrowUpDown,
   UserPlus,
-  MapPin
+  MapPin,
+  EyeOff,
+  Key,
+  LogOut
 } from 'lucide-react';
 
 export const AdminControlPortal: React.FC = () => {
@@ -80,15 +83,26 @@ export const AdminControlPortal: React.FC = () => {
     setPortalMode,
     loginSupervisor,
     loginWithGoogle,
+    logout,
     authError,
-    clearAuthError
+    clearAuthError,
+    adminMasterPin,
+    updateAdminMasterPin
   } = useTravel();
 
-  // Admin Login Inputs
+  // Admin Login & PIN Security State
   const [adminEmailInput, setAdminEmailInput] = useState('qpjiu.sea@gmail.com');
   const [adminPinInput, setAdminPinInput] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [loginFeedback, setLoginFeedback] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Change PIN Modal State
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
+  const [oldPinInput, setOldPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [changePinError, setChangePinError] = useState<string | null>(null);
+  const [changePinSuccess, setChangePinSuccess] = useState<string | null>(null);
 
   // Active Admin Sub-tab (Default to passenger requests & registered drivers to answer supervisor needs directly)
   const [adminTab, setAdminTab] = useState<
@@ -468,31 +482,21 @@ export const AdminControlPortal: React.FC = () => {
   const isAdmin = userProfile?.role === 'admin' || 
     userProfile?.roles?.includes('admin') ||
     currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
-    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com' ||
-    portalMode === 'admin';
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
 
   if (!isAdmin) {
-    const handleDirectAdminLogin = async () => {
-      setIsLoggingIn(true);
-      setLoginFeedback(null);
-      try {
-        await loginSupervisor('qpjiu.sea@gmail.com');
-      } catch (e: any) {
-        setLoginFeedback(e?.message || 'حدث خطأ أثناء تفعيل حساب المشرف');
-      } finally {
-        setIsLoggingIn(false);
-      }
-    };
-
-    const handleCustomAdminLogin = async (e: React.FormEvent) => {
+    const handlePinLogin = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!adminEmailInput.trim()) return;
+      if (!adminPinInput.trim()) {
+        setLoginFeedback('يرجى كتابة رمز المشرف السري (PIN) للدخول.');
+        return;
+      }
       setIsLoggingIn(true);
       setLoginFeedback(null);
       try {
-        await loginSupervisor(adminEmailInput.trim(), adminPinInput.trim());
+        await loginSupervisor('qpjiu.sea@gmail.com', adminPinInput.trim());
       } catch (e: any) {
-        setLoginFeedback(e?.message || 'تعذر تسجيل الدخول');
+        setLoginFeedback(e?.message || 'رمز المشرف السري (PIN) غير صحيح! تأكد من الرمز وحاول ثانية.');
       } finally {
         setIsLoggingIn(false);
       }
@@ -504,118 +508,105 @@ export const AdminControlPortal: React.FC = () => {
       try {
         await loginWithGoogle();
       } catch (e: any) {
-        setLoginFeedback('⚠️ المتصفح أو بيئة الويب حظرت نافذة Google المنبثقة. تم توفير خيار الدخول المباشر بنقرة واحدة أدناه للدخول فوراً.');
+        setLoginFeedback('⚠️ نافذة Google حُظرت بواسطة المتصفح. يمكنك الدخول فوراً باستخدام رمز المرور السري للمشرف (PIN) أدناه.');
       } finally {
         setIsLoggingIn(false);
       }
     };
 
     return (
-      <div className="max-w-2xl mx-auto my-8 p-6 sm:p-8 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-2xl text-center space-y-6">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
-          <Crown className="w-8 h-8" />
+      <div className="max-w-xl mx-auto my-10 p-6 sm:p-8 rounded-3xl bg-white dark:bg-stone-900 border-2 border-amber-500/30 shadow-2xl text-center space-y-6">
+        <div className="relative w-20 h-20 mx-auto">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-xl shadow-amber-500/25">
+            <Crown className="w-10 h-10" />
+          </div>
+          <div className="absolute -bottom-1 -end-1 w-8 h-8 rounded-xl bg-stone-900 text-amber-400 flex items-center justify-center border-2 border-white dark:border-stone-800 shadow-md">
+            <Lock className="w-4 h-4" />
+          </div>
         </div>
         
         <div>
-          <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold text-xs inline-flex items-center gap-1.5 border border-amber-300 dark:border-amber-700 mb-2">
-            <Lock className="w-3.5 h-3.5" />
-            <span>بوابة الإدارة والرقابة المركزية (Super Admin)</span>
+          <span className="px-3.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 font-black text-xs inline-flex items-center gap-1.5 border border-amber-300 dark:border-amber-700 mb-2.5">
+            <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>منطقة إدارة محمية برمز مرور سري (PIN Protected) 🔒</span>
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white mt-1">
-            تسجيل دخول المشرف المعتمد 👑
+            لوحة تحكم المشرف العام (Super Admin) 👑
           </h2>
-          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-2 leading-relaxed max-w-lg mx-auto">
-            مرحباً بك! للمراجعة والإشراف على بيانات الكباتن المسجلين، كراج المركبات، وسجل حجوزات المسافرين، يرجى تأكيد الدخول بحساب المشرف.
+          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-2.5 leading-relaxed max-w-md mx-auto">
+            هذه اللوحة خاصة بمالك المنصة للاطلاع على سجل طلبات المسافرين، واعتماد بيانات الكباتن ومكاتب النقل. أي شخص يفتح الرابط لن يتمكن من الدخول إلا بإدخال الرمز السري.
           </p>
         </div>
 
         {/* Error / Feedback Banner */}
         {(loginFeedback || authError) && (
-          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs text-start leading-relaxed flex items-start gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 text-xs text-start leading-relaxed flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-bold">{loginFeedback || authError}</p>
-              <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                يمكنك الضغط على زر الدخول الفوري بنقرة واحدة أدناه للدخول إلى لوحة التحكم فوراً وبأمان تام دون الحاجة لفتح نافذة Google.
+              <p className="text-[11px] text-red-700 dark:text-red-300">
+                يرجى إدخال الرمز السري الصحيح المخصص للمشرف، أو التواصل مع مسؤول النظام.
               </p>
             </div>
           </div>
         )}
 
-        {/* Primary 1-Click Fast Supervisor Access Button */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 via-stone-50 to-amber-50/50 dark:from-stone-800/80 dark:via-stone-900 dark:to-stone-800/80 border-2 border-amber-500/40 space-y-3">
-          <div className="text-start">
-            <h4 className="text-xs font-black text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              <span>الخيار الأسرع (موصى به للمشرف على الويب والجوال):</span>
-            </h4>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
-              دخول مباشر وفوري بحساب الإدارة (qpjiu.sea@gmail.com) وتجاوز مشاكل حظر النوافذ المنبثقة بالمتصفح.
+        {/* Secure PIN Entry Form */}
+        <form onSubmit={handlePinLogin} className="space-y-4 p-5 sm:p-6 rounded-3xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 text-start">
+          <div className="space-y-1">
+            <label className="text-xs font-black text-stone-800 dark:text-stone-200 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Key className="w-4 h-4 text-amber-600" />
+                <span>أدخل رمز المشرف السري (Admin Master PIN):</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+              >
+                {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showPin ? 'إخفاء' : 'إظهار الرمز'}</span>
+              </button>
+            </label>
+            <div className="relative">
+              <input
+                type={showPin ? 'text' : 'password'}
+                value={adminPinInput}
+                onChange={e => {
+                  setAdminPinInput(e.target.value);
+                  setLoginFeedback(null);
+                }}
+                placeholder="أدخل الرمز السري (الافتراضي: 2026)"
+                autoFocus
+                className="w-full text-center text-lg sm:text-xl font-mono tracking-widest px-4 py-3.5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-stone-300 dark:border-stone-600 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-stone-900 dark:text-white transition outline-none"
+              />
+            </div>
+            <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>الرمز السري الافتراضي للمشرف هو: <strong className="font-mono text-amber-700 dark:text-amber-300">2026</strong> (يمكنك تغييره لاحقاً من داخل الإعدادات).</span>
             </p>
           </div>
 
           <button
-            onClick={handleDirectAdminLogin}
-            disabled={isLoggingIn}
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs sm:text-sm shadow-lg shadow-amber-600/30 transition transform active:scale-98 flex items-center justify-center gap-2"
-          >
-            <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200" />
-            <span>
-              {isLoggingIn 
-                ? 'جاري فتح لوحة المشرف...' 
-                : 'الدخول الفوري بنقرة واحدة كمسؤول (qpjiu.sea@gmail.com) 👑'}
-            </span>
-          </button>
-        </div>
-
-        {/* Custom Email or Passcode Login Form */}
-        <form onSubmit={handleCustomAdminLogin} className="space-y-3 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 text-start">
-          <h4 className="text-xs font-bold text-stone-700 dark:text-stone-300">
-            أو الدخول ببريدك الإلكتروني والرمز:
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 block mb-1">
-                البريد الإلكتروني للإدارة
-              </label>
-              <input
-                type="email"
-                value={adminEmailInput}
-                onChange={e => setAdminEmailInput(e.target.value)}
-                placeholder="qpjiu.sea@gmail.com"
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 block mb-1">
-                رمز المشرف السري (PIN / Passcode)
-              </label>
-              <input
-                type="password"
-                value={adminPinInput}
-                onChange={e => setAdminPinInput(e.target.value)}
-                placeholder="رمز المشرف (اختياري)"
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200"
-              />
-            </div>
-          </div>
-          <button
             type="submit"
             disabled={isLoggingIn}
-            className="w-full py-2.5 rounded-xl bg-stone-800 hover:bg-stone-900 dark:bg-stone-700 dark:hover:bg-stone-600 text-white font-bold text-xs transition flex items-center justify-center gap-1.5"
+            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-sm shadow-lg shadow-amber-600/25 transition transform active:scale-98 flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>تأكيد الدخول للإدارة</span>
+            <CheckCircle2 className="w-5 h-5 text-amber-200" />
+            <span>{isLoggingIn ? 'جاري التحقق من الرمز...' : 'فتح لوحة التحكم بالرمز السري 🔑'}</span>
           </button>
         </form>
 
-        {/* Google OAuth Option */}
-        <div className="space-y-2">
+        {/* Alternative Google Sign-in */}
+        <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
+          <p className="text-[11px] text-stone-400 dark:text-stone-500">
+            أو الدخول عبر حساب Google الرسمي الخاص بالمشرف:
+          </p>
           <button
             onClick={handleGoogleLoginAttempt}
             disabled={isLoggingIn}
             type="button"
-            className="w-full py-2.5 px-4 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 text-xs font-bold transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/80 text-stone-700 dark:text-stone-300 text-xs font-bold transition flex items-center justify-center gap-2"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -623,24 +614,24 @@ export const AdminControlPortal: React.FC = () => {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
             </svg>
-            <span>الدخول عبر نافذة حساب Google الرسمية</span>
+            <span>الدخول بحساب المشرف (qpjiu.sea@gmail.com)</span>
           </button>
         </div>
 
-        {/* Footer Navigation Shortcuts */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 border-t border-stone-200 dark:border-stone-800 text-xs">
+        {/* Public Visitor Safe Shortcuts */}
+        <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2 border-t border-stone-200 dark:border-stone-800 text-xs">
           <button
             onClick={() => setActiveTab('driver_portal')}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-100 font-bold transition flex items-center justify-center gap-1.5"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-100 font-bold transition flex items-center justify-center gap-1.5"
           >
             <Car className="w-3.5 h-3.5 text-emerald-600" />
             <span>الانتقال لبوابة الكباتن 🚗</span>
           </button>
           <button
             onClick={() => setActiveTab('intercity_hub')}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold transition"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold transition"
           >
-            تصفح سوق رحلات المسافرين
+            تصفح سوق رحلات المسافرين 🎒
           </button>
         </div>
       </div>
@@ -663,9 +654,33 @@ export const AdminControlPortal: React.FC = () => {
                 <span>لوحة الإدارة والتحكم الشاملة (Super Admin)</span>
               </span>
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-xs font-bold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>صلاحيات واسعة مفعلة</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>محمية برمز المشرف (PIN) 🔒</span>
               </span>
+              <button
+                onClick={() => {
+                  setOldPinInput('');
+                  setNewPinInput('');
+                  setChangePinError(null);
+                  setChangePinSuccess(null);
+                  setIsChangePinModalOpen(true);
+                }}
+                className="px-3 py-1 rounded-full bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                title="تغيير رمز المشرف السري"
+              >
+                <Key className="w-3 h-3 text-amber-400" />
+                <span>تغيير الرمز السري (PIN)</span>
+              </button>
+              <button
+                onClick={async () => {
+                  await logout();
+                }}
+                className="px-3 py-1 rounded-full bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                title="قفل لوحة المشرف وتسجيل الخروج"
+              >
+                <LogOut className="w-3 h-3 text-red-400" />
+                <span>قفل اللوحة والخروج 🔒</span>
+              </button>
             </div>
 
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">
@@ -2784,6 +2799,107 @@ export const AdminControlPortal: React.FC = () => {
           initialOffice={socialOffice}
           initialCampaignType="driver_recruitment"
         />
+      )}
+
+      {/* Change Admin Master PIN Modal */}
+      {isChangePinModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-stone-900 rounded-3xl p-6 border border-stone-200 dark:border-stone-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-200 dark:border-stone-800">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-stone-900 dark:text-white">تغيير رمز المشرف السري (Master PIN)</h3>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">تحكم بالرمز السري لقفل لوحة المشرف وحمايتها</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsChangePinModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {changePinError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs">
+                {changePinError}
+              </div>
+            )}
+
+            {changePinSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs">
+                {changePinSuccess}
+              </div>
+            )}
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setChangePinError(null);
+              setChangePinSuccess(null);
+              if (!oldPinInput.trim() || !newPinInput.trim()) {
+                setChangePinError('يرجى كتابة الرمز الحالي والرمز الجديد.');
+                return;
+              }
+              if (newPinInput.trim().length < 4) {
+                setChangePinError('الرمز الجديد يجب أن يتكون من 4 خانات على الأقل.');
+                return;
+              }
+              const success = updateAdminMasterPin(oldPinInput.trim(), newPinInput.trim());
+              if (success) {
+                setChangePinSuccess('تم تغيير رمز المشرف بنجاح! احتفظ بالرمز الجديد.');
+                setTimeout(() => {
+                  setIsChangePinModalOpen(false);
+                }, 1600);
+              } else {
+                setChangePinError('الرمز الحالي غير صحيح! يرجى التأكد من الرمز الحالي.');
+              }
+            }} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">
+                  الرمز السري الحالي:
+                </label>
+                <input
+                  type="password"
+                  value={oldPinInput}
+                  onChange={e => setOldPinInput(e.target.value)}
+                  placeholder="الرمز الحالي (الافتراضي 2026)"
+                  className="w-full px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-mono text-center tracking-widest text-stone-900 dark:text-white outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">
+                  الرمز السري الجديد (4 أرقام أو أكثر):
+                </label>
+                <input
+                  type="password"
+                  value={newPinInput}
+                  onChange={e => setNewPinInput(e.target.value)}
+                  placeholder="الرمز الجديد..."
+                  className="w-full px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-mono text-center tracking-widest text-stone-900 dark:text-white outline-none focus:border-amber-500"
+                />
+              </div>
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangePinModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 font-bold hover:bg-stone-200"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>تأكيد الحفظ</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
     </div>

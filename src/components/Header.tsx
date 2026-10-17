@@ -69,8 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isAdmin = userProfile?.role === 'admin' || 
     userProfile?.roles?.includes('admin') ||
     currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
-    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com' ||
-    portalMode === 'admin';
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com';
 
   const tabs: { id: TabType; labelEn: string; labelAr: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة', icon: Compass },
