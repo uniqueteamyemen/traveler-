@@ -194,6 +194,21 @@ export interface Booking {
   notes?: string;
 }
 
+export interface PassengerRideRequest {
+  id: string;
+  passengerName: string;
+  passengerPhone: string;
+  fromGovernorate: string;
+  toGovernorate: string;
+  tripDate: string;
+  bookingMode: 'seat' | 'full_car';
+  passengersCount: number;
+  notes?: string;
+  createdAt: string;
+  status: 'new' | 'contacted' | 'confirmed' | 'cancelled';
+  matchedDriverOrOffice?: string;
+}
+
 export interface Expense {
   id: string;
   title: string;

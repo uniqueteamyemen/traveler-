@@ -1,4 +1,4 @@
-import { GovernorateInfo, InterCityTripListing } from '../types/travel';
+import { GovernorateInfo, InterCityTripListing, PassengerRideRequest } from '../types/travel';
 
 export const YEMEN_GOVERNORATES: GovernorateInfo[] = [
   {
@@ -657,5 +657,62 @@ export const INITIAL_INTERCITY_TRIPS: InterCityTripListing[] = [
         locationName: 'مدخل مأرب الغربي'
       }
     ]
+  }
+];
+
+export const INITIAL_PASSENGER_REQUESTS: PassengerRideRequest[] = [
+  {
+    id: 'req-pass-1',
+    passengerName: 'عبد الرحمن السقاف',
+    passengerPhone: '+967 771 234 567',
+    fromGovernorate: 'عدن',
+    toGovernorate: 'حضرموت',
+    tripDate: '2026-10-20',
+    bookingMode: 'seat',
+    passengersCount: 2,
+    notes: 'يفضل سيارة لاندكروزر أو برادو مكيفة، مع حقيبتين سفر متوسطة.',
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    status: 'new'
+  },
+  {
+    id: 'req-pass-2',
+    passengerName: 'أم محمد الكبسي',
+    passengerPhone: '+967 733 987 654',
+    fromGovernorate: 'صنعاء القديمة وأمانة العاصمة',
+    toGovernorate: 'مأرب',
+    tripDate: '2026-10-22',
+    bookingMode: 'full_car',
+    passengersCount: 5,
+    notes: 'مشوار خاص عائلي VIP مع كود تتبع عائلي مباشر للأهل.',
+    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+    status: 'contacted',
+    matchedDriverOrOffice: 'الكابتن / فهد الدوسري (نيسان باترول)'
+  },
+  {
+    id: 'req-pass-3',
+    passengerName: 'طارق الشميري',
+    passengerPhone: '+967 711 555 888',
+    fromGovernorate: 'تعز',
+    toGovernorate: 'عدن',
+    tripDate: '2026-10-19',
+    bookingMode: 'seat',
+    passengersCount: 3,
+    notes: 'الانطلاق صباحاً عبر طريق هيجة العبد أو نقيل الصحى.',
+    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+    status: 'confirmed',
+    matchedDriverOrOffice: 'الكابتن / وضاح اليافعي'
+  },
+  {
+    id: 'req-pass-4',
+    passengerName: 'م. فيصل البركاني',
+    passengerPhone: '+967 777 444 333',
+    fromGovernorate: 'حضرموت',
+    toGovernorate: 'صنعاء القديمة وأمانة العاصمة',
+    tripDate: '2026-10-25',
+    bookingMode: 'seat',
+    passengersCount: 1,
+    notes: 'سفر من سيئون إلى صنعاء، يفضل الانطلاق بعد صلاة الفجر مباشرة.',
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    status: 'new'
   }
 ];

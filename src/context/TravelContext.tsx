@@ -24,10 +24,11 @@ import {
   TripConflictNotice,
   AppChatMessage,
   FAQItem,
-  PortalMode
+  PortalMode,
+  PassengerRideRequest
 } from '../types/travel';
 import { loadTrips, saveTrips, getSavedActiveTripId, saveActiveTripId, getSavedLanguage, saveLanguage, getSavedTheme, saveTheme } from '../utils/storage';
-import { INITIAL_INTERCITY_TRIPS } from '../data/yemenData';
+import { INITIAL_INTERCITY_TRIPS, INITIAL_PASSENGER_REQUESTS } from '../data/yemenData';
 import { INITIAL_TRANSPORT_OFFICES } from '../data/transportOfficesData';
 import { playNotificationChime } from '../utils/audioChime';
 import { checkPlateCollision } from '../services/tripConflictService';
@@ -127,6 +128,12 @@ interface TravelContextType {
   addFaqItem: (item: Omit<FAQItem, 'id'>) => void;
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
+
+  // Passenger Travel Requests & Bookings Registry
+  passengerRequests: PassengerRideRequest[];
+  addPassengerRequest: (req: Omit<PassengerRideRequest, 'id' | 'createdAt'>) => void;
+  updatePassengerRequestStatus: (id: string, status: PassengerRideRequest['status'], matchedEntity?: string) => void;
+  deletePassengerRequest: (id: string) => void;
 
   // Offline SMS Trip Processing
   processDriverSMS: (smsText: string, senderPhone?: string) => ParsedSMSResult;
@@ -247,6 +254,7 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
 
 const CHAT_MESSAGES_KEY = 'safar_app_chat_messages_v1';
 const FAQS_KEY = 'safar_app_faqs_v1';
+const PASSENGER_REQUESTS_KEY = 'safar_passenger_requests_v1';
 
 const INITIAL_FAQS: FAQItem[] = [
   {
@@ -540,6 +548,19 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return INITIAL_FAQS;
   });
 
+  const [passengerRequests, setPassengerRequests] = useState<PassengerRideRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem(PASSENGER_REQUESTS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load passenger requests:', e);
+    }
+    return INITIAL_PASSENGER_REQUESTS;
+  });
+
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -557,6 +578,14 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       console.error(e);
     }
   }, [faqs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PASSENGER_REQUESTS_KEY, JSON.stringify(passengerRequests));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [passengerRequests]);
 
   useEffect(() => {
     try {
@@ -1113,6 +1142,41 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
+  const addPassengerRequest = (req: Omit<PassengerRideRequest, 'id' | 'createdAt'>) => {
+    const newReq: PassengerRideRequest = {
+      ...req,
+      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString()
+    };
+    setPassengerRequests(prev => [newReq, ...prev]);
+    addNotification({
+      title: 'Passenger Travel Request Logged',
+      titleAr: `تم تسجيل طلب سفر جديد: (${newReq.fromGovernorate} ← ${newReq.toGovernorate})`,
+      message: `Traveler ${newReq.passengerName} requested a trip.`,
+      messageAr: `المسافر (${newReq.passengerName}) يبحث عن رحلة (${newReq.bookingMode === 'full_car' ? 'سيارة كاملة' : `${newReq.passengersCount} مقاعد`}) من ${newReq.fromGovernorate} إلى ${newReq.toGovernorate}. تم إدراجه في سجل المسافرين للمشرف والكباتن.`,
+      type: 'general',
+      priority: 'high',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const updatePassengerRequestStatus = (id: string, status: PassengerRideRequest['status'], matchedEntity?: string) => {
+    setPassengerRequests(prev => prev.map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          status,
+          matchedDriverOrOffice: matchedEntity !== undefined ? matchedEntity : r.matchedDriverOrOffice
+        };
+      }
+      return r;
+    }));
+  };
+
+  const deletePassengerRequest = (id: string) => {
+    setPassengerRequests(prev => prev.filter(r => r.id !== id));
+  };
+
   const updateContactPhones = async (primaryPhone: string, secondaryPhone: string, whatsappPhone: string) => {
     if (!userProfile) return;
     const updated: UserProfile = {
@@ -1370,6 +1434,23 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       return l;
     }));
+
+    // Record into Centralized Passenger Requests & Bookings Registry for Admin & Supervision
+    const newPassengerReq: PassengerRideRequest = {
+      id: `req-book-${Date.now()}`,
+      passengerName,
+      passengerPhone,
+      fromGovernorate: listing.fromGovernorate,
+      toGovernorate: listing.toGovernorate,
+      tripDate: listing.departureDate || new Date().toISOString().split('T')[0],
+      bookingMode: isFullCar ? 'full_car' : 'seat',
+      passengersCount: actualSeats,
+      notes: `حجز مباشر من سوق رحلات المحافظات مع (${listing.operatorType === 'company' ? listing.companyName : listing.driverName}) - موعد الانطلاق: ${listing.departureTime}`,
+      createdAt: new Date().toISOString(),
+      status: 'confirmed',
+      matchedDriverOrOffice: listing.operatorType === 'company' ? listing.companyName : listing.driverName
+    };
+    setPassengerRequests(prev => [newPassengerReq, ...prev]);
 
     if (activeTrip) {
       const modeLabel = isFullCar 
@@ -1893,6 +1974,10 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         addFaqItem,
         isChatOpen,
         setIsChatOpen,
+        passengerRequests,
+        addPassengerRequest,
+        updatePassengerRequestStatus,
+        deletePassengerRequest,
         processDriverSMS,
         transportOffices,
         addTransportOffice,

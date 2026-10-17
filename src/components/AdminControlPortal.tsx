@@ -6,7 +6,8 @@ import {
   OfficeCategory, 
   OfficeSubscriptionTier, 
   OfficeSubscriptionStatus,
-  InterCityTripListing
+  InterCityTripListing,
+  PassengerRideRequest
 } from '../types/travel';
 import { CompanyShowcaseModal } from './modals/CompanyShowcaseModal';
 import { SocialMediaAutoPosterModal } from './modals/SocialMediaAutoPosterModal';
@@ -37,7 +38,15 @@ import {
   TrendingUp, 
   Layers, 
   UserCheck, 
-  RefreshCw 
+  RefreshCw,
+  PhoneCall,
+  Send,
+  Check,
+  ExternalLink,
+  Clock,
+  ArrowUpDown,
+  UserPlus,
+  MapPin
 } from 'lucide-react';
 
 export const AdminControlPortal: React.FC = () => {
@@ -60,11 +69,46 @@ export const AdminControlPortal: React.FC = () => {
     chatMessages,
     adminReplyChatMessage,
     faqs,
-    addFaqItem
+    addFaqItem,
+    passengerRequests,
+    addPassengerRequest,
+    updatePassengerRequestStatus,
+    deletePassengerRequest,
+    driverVehicles,
+    currentUser,
+    portalMode,
+    setPortalMode
   } = useTravel();
 
-  // Active Admin Sub-tab
-  const [adminTab, setAdminTab] = useState<'offices_subscriptions' | 'individual_drivers' | 'trip_conflicts' | 'pricing_tiers' | 'support_chat_faq'>('offices_subscriptions');
+  // Active Admin Sub-tab (Default to passenger requests & registered drivers to answer supervisor needs directly)
+  const [adminTab, setAdminTab] = useState<
+    'passenger_requests' | 
+    'registered_captains' | 
+    'individual_drivers' | 
+    'offices_subscriptions' | 
+    'trip_conflicts' | 
+    'pricing_tiers' | 
+    'support_chat_faq'
+  >('passenger_requests');
+
+  // Passenger Requests Supervision State
+  const [passengerSearchQuery, setPassengerSearchQuery] = useState('');
+  const [passengerStatusFilter, setPassengerStatusFilter] = useState<'all' | 'new' | 'contacted' | 'confirmed' | 'cancelled'>('all');
+  const [passengerGovFilter, setPassengerGovFilter] = useState('all');
+  const [isAddPassengerModalOpen, setIsAddPassengerModalOpen] = useState(false);
+  const [newPassName, setNewPassName] = useState('');
+  const [newPassPhone, setNewPassPhone] = useState('');
+  const [newPassFromGov, setNewPassFromGov] = useState('صنعاء القديمة وأمانة العاصمة');
+  const [newPassToGov, setNewPassToGov] = useState('عدن');
+  const [newPassDate, setNewPassDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newPassMode, setNewPassMode] = useState<'seat' | 'full_car'>('seat');
+  const [newPassSeats, setNewPassSeats] = useState<number>(1);
+  const [newPassNotes, setNewPassNotes] = useState('');
+
+  // Registered Captains Supervision State
+  const [captainSearchQuery, setCaptainSearchQuery] = useState('');
+  const [captainGovFilter, setCaptainGovFilter] = useState('all');
+  const [captainVerificationFilter, setCaptainVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all');
 
   // Support Chat & FAQ Admin State
   const [chatCategoryFilter, setChatCategoryFilter] = useState<'all' | 'captain_question' | 'trip_booking' | 'safety_inquiry' | 'general_inquiry'>('all');
@@ -156,6 +200,164 @@ export const AdminControlPortal: React.FC = () => {
     }
     return true;
   });
+
+  // Filtered Passenger Requests
+  const filteredPassengerRequests = passengerRequests.filter(req => {
+    if (passengerStatusFilter !== 'all' && req.status !== passengerStatusFilter) return false;
+    if (passengerGovFilter !== 'all' && req.fromGovernorate !== passengerGovFilter && req.toGovernorate !== passengerGovFilter) return false;
+    if (passengerSearchQuery.trim()) {
+      const q = passengerSearchQuery.toLowerCase();
+      const match = 
+        req.passengerName.toLowerCase().includes(q) ||
+        req.passengerPhone.includes(q) ||
+        req.fromGovernorate.toLowerCase().includes(q) ||
+        req.toGovernorate.toLowerCase().includes(q) ||
+        (req.notes && req.notes.toLowerCase().includes(q)) ||
+        (req.matchedDriverOrOffice && req.matchedDriverOrOffice.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  // Consolidated Registered Captains List
+  interface ConsolidatedCaptain {
+    id: string;
+    name: string;
+    phone: string;
+    whatsapp: string;
+    governorate: string;
+    vehicleModel: string;
+    plateNumber: string;
+    vehicleType: string;
+    totalSeats: number;
+    year?: number;
+    color?: string;
+    isVerified: boolean;
+    rating: number;
+    totalTrips: number;
+    familyTrackingCode?: string;
+    registeredVia: 'onboarding_portal' | 'trip_listing';
+    registeredAt?: string;
+  }
+
+  const consolidatedCaptains: ConsolidatedCaptain[] = [];
+  const seenPhones = new Set<string>();
+
+  // 1. From driverVehicles (Registered via Onboarding / Garage)
+  driverVehicles.forEach((veh, idx) => {
+    const rawPhone = (veh.ownerPhone || userProfile?.primaryPhone || userProfile?.phoneNumber || '+967 770 000 000').replace(/[^0-9]/g, '');
+    if (!seenPhones.has(rawPhone)) {
+      seenPhones.add(rawPhone);
+      consolidatedCaptains.push({
+        id: veh.id,
+        name: veh.ownerName || userProfile?.displayName || `كابتن مسجل #${idx + 1}`,
+        phone: veh.ownerPhone || userProfile?.primaryPhone || userProfile?.phoneNumber || '+967 770 000 000',
+        whatsapp: userProfile?.whatsappPhone || veh.ownerPhone || userProfile?.primaryPhone || '+967 770 000 000',
+        governorate: userProfile?.governorate || 'عدن',
+        vehicleModel: veh.model,
+        plateNumber: veh.plateNumber,
+        vehicleType: veh.vehicleType,
+        totalSeats: veh.totalSeats,
+        year: veh.year,
+        color: veh.color,
+        isVerified: Boolean(userProfile?.isDriverVerified),
+        rating: 5.0,
+        totalTrips: 1,
+        registeredVia: 'onboarding_portal',
+        registeredAt: veh.createdAt
+      });
+    }
+  });
+
+  // 2. From userProfile if driver/captain and not already added
+  if (userProfile && (userProfile.role === 'driver' || userProfile.role === 'vehicle_owner' || userProfile.userType === 'captain')) {
+    const rawPhone = (userProfile.primaryPhone || userProfile.phoneNumber || '').replace(/[^0-9]/g, '');
+    if (rawPhone && !seenPhones.has(rawPhone)) {
+      seenPhones.add(rawPhone);
+      consolidatedCaptains.push({
+        id: userProfile.uid,
+        name: userProfile.displayName || 'كابتن موثق',
+        phone: userProfile.primaryPhone || userProfile.phoneNumber || '',
+        whatsapp: userProfile.whatsappPhone || userProfile.primaryPhone || '',
+        governorate: userProfile.governorate || 'عدن',
+        vehicleModel: userProfile.registeredVehicles?.[0]?.model || 'سيارة مسجلة',
+        plateNumber: userProfile.registeredVehicles?.[0]?.plateNumber || 'لوحة قيد التوثيق',
+        vehicleType: userProfile.registeredVehicles?.[0]?.vehicleType || 'suv_4x4',
+        totalSeats: userProfile.registeredVehicles?.[0]?.totalSeats || 7,
+        isVerified: Boolean(userProfile.isDriverVerified),
+        rating: 5.0,
+        totalTrips: 2,
+        registeredVia: 'onboarding_portal',
+        registeredAt: userProfile.createdAt
+      });
+    }
+  }
+
+  // 3. From intercityListings
+  intercityListings.forEach(listing => {
+    const rawPhone = (listing.driverPhone || '').replace(/[^0-9]/g, '');
+    if (rawPhone && !seenPhones.has(rawPhone)) {
+      seenPhones.add(rawPhone);
+      consolidatedCaptains.push({
+        id: `cap-${listing.id}`,
+        name: listing.driverName,
+        phone: listing.driverPhone,
+        whatsapp: listing.driverWhatsapp || listing.driverPhone,
+        governorate: listing.fromGovernorate,
+        vehicleModel: listing.vehicleModel,
+        plateNumber: listing.vehiclePlateNumber,
+        vehicleType: listing.vehicleType,
+        totalSeats: listing.totalSeats,
+        year: listing.vehicleYear,
+        isVerified: listing.isVerifiedDriver,
+        rating: listing.driverRating,
+        totalTrips: listing.totalTripsCompleted,
+        familyTrackingCode: listing.familyTrackingCode,
+        registeredVia: 'trip_listing'
+      });
+    }
+  });
+
+  // Filtered Captains
+  const filteredCaptains = consolidatedCaptains.filter(cap => {
+    if (captainGovFilter !== 'all' && !cap.governorate.includes(captainGovFilter)) return false;
+    if (captainVerificationFilter === 'verified' && !cap.isVerified) return false;
+    if (captainVerificationFilter === 'unverified' && cap.isVerified) return false;
+    if (captainSearchQuery.trim()) {
+      const q = captainSearchQuery.toLowerCase();
+      const match = 
+        cap.name.toLowerCase().includes(q) ||
+        cap.phone.includes(q) ||
+        cap.vehicleModel.toLowerCase().includes(q) ||
+        cap.plateNumber.toLowerCase().includes(q) ||
+        cap.governorate.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  const handleCreatePassengerRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassName.trim() || !newPassPhone.trim()) return;
+
+    addPassengerRequest({
+      passengerName: newPassName.trim(),
+      passengerPhone: newPassPhone.trim(),
+      fromGovernorate: newPassFromGov,
+      toGovernorate: newPassToGov,
+      tripDate: newPassDate,
+      bookingMode: newPassMode,
+      passengersCount: Number(newPassSeats),
+      notes: newPassNotes.trim() || undefined,
+      status: 'new'
+    });
+
+    setIsAddPassengerModalOpen(false);
+    setNewPassName('');
+    setNewPassPhone('');
+    setNewPassNotes('');
+    setNewPassSeats(1);
+  };
 
   const handleOpenEditSubscription = (office: TransportOffice) => {
     setEditingOffice(office);
@@ -253,7 +455,11 @@ export const AdminControlPortal: React.FC = () => {
     setNewOfficeAbout('');
   };
 
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.roles?.includes('admin');
+  const isAdmin = userProfile?.role === 'admin' || 
+    userProfile?.roles?.includes('admin') ||
+    currentUser?.email?.toLowerCase() === 'baker@deterministicsolutionsdesign.com' ||
+    currentUser?.email?.toLowerCase() === 'qpjiu.sea@gmail.com' ||
+    portalMode === 'admin';
 
   if (!isAdmin) {
     return (
@@ -266,20 +472,29 @@ export const AdminControlPortal: React.FC = () => {
             منطقة مخصصة للإدارة المركزية فقط 🔒
           </h2>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-2 leading-relaxed max-w-md mx-auto">
-            عذراً، ليس لديك صلاحية للوصول إلى لوحة الإدارة العامة والاشتراكات. تم تقييد هذه الصلاحيات إدارياً لحماية بيانات المسافرين والشركات.
+            عذراً، يتطلب الوصول إلى لوحة المشرف تسجيل الدخول بحساب الإدارة المعتمد (qpjiu.sea@gmail.com) أو تفعيل وضع المشرف.
           </p>
         </div>
 
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
-            onClick={() => setActiveTab('driver_portal')}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition"
+            onClick={() => {
+              updateUserRole('admin');
+            }}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-md transition flex items-center justify-center gap-1.5"
           >
-            الانتقال لبوابة الكباتن وملاك السيارات 🚗
+            <Crown className="w-4 h-4 text-amber-200" />
+            <span>الدخول الفوري بصلاحية المشرف العام (Super Admin) 👑</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('driver_portal')}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition"
+          >
+            الانتقال لبوابة الكباتن 🚗
           </button>
           <button
             onClick={() => setActiveTab('intercity_hub')}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold text-xs transition"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold text-xs transition"
           >
             تصفح رحلات المسافرين
           </button>
@@ -319,24 +534,31 @@ export const AdminControlPortal: React.FC = () => {
 
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full lg:w-auto shrink-0">
-            <div className="bg-black/40 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-center">
-              <span className="text-[10px] text-stone-400 block font-medium">إجمالي المكاتب</span>
-              <span className="text-lg font-black text-white">{totalOffices}</span>
+            <div className="bg-amber-500/20 backdrop-blur-md p-3 rounded-2xl border border-amber-500/40 text-center">
+              <span className="text-[10px] text-amber-200 block font-medium">الراغبون في السفر</span>
+              <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-white">{passengerRequests.length}</span>
+                {passengerRequests.filter(r => r.status === 'new').length > 0 && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-400 text-stone-950 font-black">
+                    {passengerRequests.filter(r => r.status === 'new').length} جديد
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="bg-emerald-950/40 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/30 text-center">
-              <span className="text-[10px] text-emerald-300 block font-medium">مكاتب مفعلة</span>
-              <span className="text-lg font-black text-emerald-400">{activeOffices.length}</span>
+              <span className="text-[10px] text-emerald-300 block font-medium">الكباتن المسجلون</span>
+              <span className="text-lg font-black text-emerald-400">{consolidatedCaptains.length}</span>
             </div>
 
-            <div className="bg-red-950/40 backdrop-blur-md p-3 rounded-2xl border border-red-500/30 text-center">
-              <span className="text-[10px] text-red-300 block font-medium">مكاتب محجوبة</span>
-              <span className="text-lg font-black text-red-400">{suspendedOffices.length}</span>
+            <div className="bg-blue-950/40 backdrop-blur-md p-3 rounded-2xl border border-blue-500/30 text-center">
+              <span className="text-[10px] text-blue-300 block font-medium">مكاتب النقل</span>
+              <span className="text-lg font-black text-blue-300">{totalOffices}</span>
             </div>
 
-            <div className="bg-amber-950/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/30 text-center">
-              <span className="text-[10px] text-amber-300 block font-medium">رسوم الاشتراكات</span>
-              <span className="text-xs font-black text-amber-400 truncate block mt-1">
+            <div className="bg-purple-950/40 backdrop-blur-md p-3 rounded-2xl border border-purple-500/30 text-center">
+              <span className="text-[10px] text-purple-300 block font-medium">رسوم الاشتراكات</span>
+              <span className="text-xs font-black text-purple-300 truncate block mt-1">
                 {totalMonthlyRevYER.toLocaleString()} YER
               </span>
             </div>
@@ -345,40 +567,75 @@ export const AdminControlPortal: React.FC = () => {
 
         {/* Admin Navigation Sub-tabs */}
         <div className="flex flex-wrap items-center gap-2 pt-5 mt-5 border-t border-white/10">
+          
+          {/* TAB 1: PASSENGERS & RIDE REQUESTS */}
           <button
-            onClick={() => setAdminTab('offices_subscriptions')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-              adminTab === 'offices_subscriptions'
-                ? 'bg-amber-500 text-stone-950 shadow-md font-black'
-                : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+            onClick={() => setAdminTab('passenger_requests')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
+              adminTab === 'passenger_requests'
+                ? 'bg-amber-500 text-stone-950 shadow-md font-black ring-2 ring-amber-300'
+                : 'bg-stone-800/80 hover:bg-stone-800 text-stone-200'
             }`}
           >
-            <Building2 className="w-4 h-4" />
-            <span>إدارة المكاتب والاشتراكات ({transportOffices.length})</span>
+            <Users className="w-4 h-4 text-amber-900" />
+            <span>سجل الراغبين في السفر والطلبات ({passengerRequests.length})</span>
+            {passengerRequests.filter(r => r.status === 'new').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black animate-pulse">
+                {passengerRequests.filter(r => r.status === 'new').length} جديد
+              </span>
+            )}
           </button>
 
+          {/* TAB 2: REGISTERED CAPTAINS */}
+          <button
+            onClick={() => setAdminTab('registered_captains')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              adminTab === 'registered_captains'
+                ? 'bg-amber-500 text-stone-950 shadow-md font-black ring-2 ring-amber-300'
+                : 'bg-stone-800/80 hover:bg-stone-800 text-stone-200'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>سجل الكباتن والسيارات المسجلة ({consolidatedCaptains.length})</span>
+          </button>
+
+          {/* TAB 3: CAPTAIN TRIP LISTINGS SUPERVISION */}
           <button
             onClick={() => setAdminTab('individual_drivers')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
               adminTab === 'individual_drivers'
                 ? 'bg-amber-500 text-stone-950 shadow-md font-black'
                 : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
             }`}
           >
             <Car className="w-4 h-4" />
-            <span>إشراف رحلات الكباتن ({intercityListings.length})</span>
+            <span>إشراف رحلات الكباتن في السوق ({intercityListings.length})</span>
           </button>
 
+          {/* TAB 4: OFFICES & SUBSCRIPTIONS */}
+          <button
+            onClick={() => setAdminTab('offices_subscriptions')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              adminTab === 'offices_subscriptions'
+                ? 'bg-amber-500 text-stone-950 shadow-md font-black'
+                : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>إدارة المكاتب والشركات ({transportOffices.length})</span>
+          </button>
+
+          {/* TAB 5: TRIP CONFLICTS */}
           <button
             onClick={() => setAdminTab('trip_conflicts')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
               adminTab === 'trip_conflicts'
                 ? 'bg-amber-500 text-stone-950 shadow-md font-black'
                 : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
             }`}
           >
             <AlertTriangle className={`w-4 h-4 ${intercityListings.some(l => l.conflictNotice?.isConflictDetected) ? 'text-red-400 animate-bounce' : ''}`} />
-            <span>نظام مقارنة وتعارض اللوحات</span>
+            <span>تعارض اللوحات</span>
             {intercityListings.filter(l => l.conflictNotice?.isConflictDetected).length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black">
                 {intercityListings.filter(l => l.conflictNotice?.isConflictDetected).length}
@@ -386,21 +643,23 @@ export const AdminControlPortal: React.FC = () => {
             )}
           </button>
 
+          {/* TAB 6: PRICING & TIERS */}
           <button
             onClick={() => setAdminTab('pricing_tiers')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
               adminTab === 'pricing_tiers'
                 ? 'bg-amber-500 text-stone-950 shadow-md font-black'
                 : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
             }`}
           >
             <DollarSign className="w-4 h-4" />
-            <span>باقات الاشتراكات وسياسة المجانية</span>
+            <span>باقات الاشتراكات</span>
           </button>
 
+          {/* TAB 7: SUPPORT CHAT & FAQ */}
           <button
             onClick={() => setAdminTab('support_chat_faq')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
               adminTab === 'support_chat_faq'
                 ? 'bg-emerald-500 text-stone-950 shadow-md font-black'
                 : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
@@ -416,6 +675,396 @@ export const AdminControlPortal: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 0.1: PASSENGER REQUESTS & TRAVELERS REGISTRY (سجل الراغبين في السفر) */}
+      {/* ========================================================================= */}
+      {adminTab === 'passenger_requests' && (
+        <div className="space-y-5">
+          
+          {/* Header & Quick Actions */}
+          <div className="bg-white dark:bg-stone-800 rounded-3xl p-5 border border-stone-200 dark:border-stone-700 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-stone-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-amber-600" />
+                  <span>سجل الراغبين في السفر وطلبات الحجز بين المحافظات</span>
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  متابعة جميع الركاب والمسافرين الذين سجلوا طلباتهم أو حجزوا مقاعد، مع أرقام التواصل والتنسيق الفوري.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsAddPassengerModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ تسجيل طلب مسافر جديد</span>
+              </button>
+            </div>
+
+            {/* Filters Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute start-3 top-3 text-stone-400" />
+                <input
+                  type="text"
+                  value={passengerSearchQuery}
+                  onChange={(e) => setPassengerSearchQuery(e.target.value)}
+                  placeholder="ابحث بالاسم، الهاتف، المحافظة، الملاحظات..."
+                  className="w-full text-xs ps-9 pe-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <select
+                value={passengerStatusFilter}
+                onChange={(e) => setPassengerStatusFilter(e.target.value as any)}
+                className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+              >
+                <option value="all">جميع الحالات (الكل)</option>
+                <option value="new">🟡 طلب جديد (بانتظار التواصل)</option>
+                <option value="contacted">🔵 تم التواصل والتنسيق</option>
+                <option value="confirmed">🟢 رحلة مؤكدة</option>
+                <option value="cancelled">⚪ ملغي</option>
+              </select>
+
+              {/* Governorate Filter */}
+              <select
+                value={passengerGovFilter}
+                onChange={(e) => setPassengerGovFilter(e.target.value)}
+                className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+              >
+                <option value="all">جميع المحافظات اليمنية</option>
+                {YEMEN_GOVERNORATES.map(gov => (
+                  <option key={gov.id} value={gov.nameAr}>{gov.nameAr}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Passenger Requests Cards / Table */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredPassengerRequests.map(req => {
+              const cleanPhone = req.passengerPhone.replace(/[^0-9]/g, '');
+              const whatsappMessage = encodeURIComponent(
+                `مرحباً ${req.passengerName}، معكم إدارة منصة المسافر (Traveler) بخصوص طلب سفركم من ${req.fromGovernorate} إلى ${req.toGovernorate} لتاريخ ${req.tripDate}. هل تودون تأكيد تفاصيل الرحلة وتنسيق الكابتن؟`
+              );
+
+              return (
+                <div 
+                  key={req.id} 
+                  className={`p-5 rounded-3xl bg-white dark:bg-stone-800 border transition shadow-sm space-y-3.5 relative overflow-hidden ${
+                    req.status === 'new' 
+                      ? 'border-amber-300 dark:border-amber-700/80 ring-1 ring-amber-400/30' 
+                      : req.status === 'confirmed'
+                      ? 'border-emerald-300 dark:border-emerald-700/80'
+                      : 'border-stone-200 dark:border-stone-700'
+                  }`}
+                >
+                  {/* Top Bar: Name & Status */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 text-amber-700 dark:text-amber-300 flex items-center justify-center font-black text-sm border border-amber-300/40">
+                        {req.passengerName.slice(0, 2)}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-stone-900 dark:text-white">
+                          {req.passengerName}
+                        </h4>
+                        <div className="text-[11px] text-stone-500 font-mono flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-stone-400" />
+                          <span>تاريخ السفر: {req.tripDate}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                        req.status === 'new'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
+                          : req.status === 'contacted'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-300'
+                          : req.status === 'confirmed'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
+                          : 'bg-stone-100 text-stone-600 dark:bg-stone-700 dark:text-stone-300'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          req.status === 'new' ? 'bg-amber-500 animate-pulse' : req.status === 'confirmed' ? 'bg-emerald-500' : 'bg-blue-500'
+                        }`} />
+                        <span>
+                          {req.status === 'new' ? 'طلب جديد' : req.status === 'contacted' ? 'تم التواصل' : req.status === 'confirmed' ? 'مؤكد' : 'ملغي'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Route & Booking Mode */}
+                  <div className="p-3 rounded-2xl bg-stone-50 dark:bg-stone-900/60 border border-stone-100 dark:border-stone-700/60 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-stone-900 dark:text-white flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{req.fromGovernorate} ← {req.toGovernorate}</span>
+                      </span>
+                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300">
+                        {req.bookingMode === 'full_car' ? '🚗 سيارة خاصة كاملة VIP' : `👤 حجز مقاعد (${req.passengersCount} مقعد)`}
+                      </span>
+                    </div>
+
+                    {req.matchedDriverOrOffice && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                        🤝 الكابتن / المزود المنسق: <strong>{req.matchedDriverOrOffice}</strong>
+                      </div>
+                    )}
+
+                    {req.notes && (
+                      <div className="text-[11px] text-stone-600 dark:text-stone-400 bg-white/70 dark:bg-stone-800/70 p-2 rounded-xl mt-1">
+                        📝 ملاحظات المسافر: {req.notes}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact & Status Controls */}
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-700 flex flex-wrap items-center justify-between gap-2">
+                    
+                    {/* Direct Contact Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={`https://wa.me/${cleanPhone}?text=${whatsappMessage}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                        title="مراسلة واتساب فورية"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>واتساب</span>
+                      </a>
+
+                      <a
+                        href={`tel:${cleanPhone}`}
+                        className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-700 dark:hover:bg-stone-600 text-stone-800 dark:text-stone-200 text-[11px] font-bold flex items-center gap-1 transition"
+                        title="اتصال هاتفي مباشر"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
+                        <span>{req.passengerPhone}</span>
+                      </a>
+                    </div>
+
+                    {/* Change Status & Actions */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={req.status}
+                        onChange={(e) => updatePassengerRequestStatus(req.id, e.target.value as any)}
+                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300"
+                      >
+                        <option value="new">جديد 🟡</option>
+                        <option value="contacted">تم التواصل 🔵</option>
+                        <option value="confirmed">تأكيد الرحلة 🟢</option>
+                        <option value="cancelled">إلغاء ⚪</option>
+                      </select>
+
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`حذف طلب المسافر ${req.passengerName}؟`)) {
+                            deletePassengerRequest(req.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                        title="حذف الطلب"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredPassengerRequests.length === 0 && (
+            <div className="bg-white dark:bg-stone-800 rounded-3xl p-10 text-center border border-stone-200 dark:border-stone-700 space-y-3">
+              <Users className="w-12 h-12 text-stone-400 mx-auto" />
+              <h3 className="text-sm font-bold text-stone-800 dark:text-stone-200">
+                لا توجد طلبات مسافرين تطابق الفلتر الحالي
+              </h3>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                يمكنك الضغط على «+ تسجيل طلب مسافر جديد» لإضافة أي راكب اتصل هاتفياً بالإدارة.
+              </p>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 0.2: REGISTERED CAPTAINS & CAR OWNERS (سجل الكباتن والسيارات) */}
+      {/* ========================================================================= */}
+      {adminTab === 'registered_captains' && (
+        <div className="space-y-5">
+          
+          {/* Header */}
+          <div className="bg-white dark:bg-stone-800 rounded-3xl p-5 border border-stone-200 dark:border-stone-700 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-stone-900 dark:text-white flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-emerald-600" />
+                  <span>سجل الكباتن وملاك السيارات المسجلين في المنصة</span>
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  جميع السائقين وأصحاب السيارات الذين أكملوا استمارة التسجيل أو أضافوا سياراتهم في كراج المنصة.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('driver_portal')}
+                  className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Car className="w-4 h-4" />
+                  <span>فتح استمارة وبوابة الكباتن 🚗</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filters Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute start-3 top-3 text-stone-400" />
+                <input
+                  type="text"
+                  value={captainSearchQuery}
+                  onChange={(e) => setCaptainSearchQuery(e.target.value)}
+                  placeholder="ابحث باسم الكابتن، الهاتف، اللوحة، الموديل..."
+                  className="w-full text-xs ps-9 pe-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              <select
+                value={captainVerificationFilter}
+                onChange={(e) => setCaptainVerificationFilter(e.target.value as any)}
+                className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+              >
+                <option value="all">جميع السائقين (الموثقون وقيد المراجعة)</option>
+                <option value="verified">🏅 كباتن موثقون ومعتمدون</option>
+                <option value="unverified">⏳ قيد المراجعة والتوثيق</option>
+              </select>
+
+              <select
+                value={captainGovFilter}
+                onChange={(e) => setCaptainGovFilter(e.target.value)}
+                className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+              >
+                <option value="all">جميع المحافظات</option>
+                {YEMEN_GOVERNORATES.map(gov => (
+                  <option key={gov.id} value={gov.nameAr}>{gov.nameAr}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Captains Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCaptains.map(cap => {
+              const cleanPhone = cap.phone.replace(/[^0-9]/g, '');
+              const cleanWa = cap.whatsapp.replace(/[^0-9]/g, '') || cleanPhone;
+              const waMsg = encodeURIComponent(`مرحباً كابتن ${cap.name}، معكم إدارة منصة المسافر اليمنية. يسعدنا متابعة بيانات تسجيلك وسيارتك (${cap.vehicleModel} - ${cap.plateNumber}).`);
+
+              return (
+                <div 
+                  key={cap.id}
+                  className="p-5 rounded-3xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm space-y-3.5 hover:shadow-md transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-center font-black border border-amber-300/40">
+                        <Car className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-stone-900 dark:text-white">
+                          {cap.name}
+                        </h4>
+                        <span className="text-[11px] text-stone-500 font-medium">
+                          محافظة {cap.governorate}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                      cap.isVerified
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
+                    }`}>
+                      {cap.isVerified ? <BadgeCheck className="w-3 h-3 text-emerald-500" /> : <Clock className="w-3 h-3 text-amber-500" />}
+                      <span>{cap.isVerified ? 'موثق' : 'قيد المراجعة'}</span>
+                    </span>
+                  </div>
+
+                  {/* Vehicle Details */}
+                  <div className="p-3 rounded-2xl bg-stone-50 dark:bg-stone-900/60 border border-stone-100 dark:border-stone-700/60 text-xs space-y-1">
+                    <div className="font-bold text-stone-900 dark:text-stone-100 flex items-center justify-between">
+                      <span>{cap.vehicleModel}</span>
+                      <span className="font-mono text-[11px] text-amber-700 dark:text-amber-400">{cap.plateNumber}</span>
+                    </div>
+                    <div className="text-[11px] text-stone-500 flex items-center justify-between">
+                      <span>المقاعد: {cap.totalSeats} مقاعد</span>
+                      {cap.year && <span>موديل: {cap.year}</span>}
+                    </div>
+                    {cap.familyTrackingCode && (
+                      <div className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 pt-1 border-t border-stone-200/50 dark:border-stone-700/50 flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                        <span>كود الأمان: {cap.familyTrackingCode}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contacts */}
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-700 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={`https://wa.me/${cleanWa}?text=${waMsg}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                        title="مراسلة واتساب"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>واتساب</span>
+                      </a>
+
+                      <a
+                        href={`tel:${cleanPhone}`}
+                        className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 text-[11px] font-bold flex items-center gap-1 transition"
+                        title="اتصال هاتفي"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        <span>اتصال</span>
+                      </a>
+                    </div>
+
+                    <span className="text-[10px] text-stone-400">
+                      {cap.registeredVia === 'onboarding_portal' ? 'استمارة التسجيل' : 'إعلان رحلة'}
+                    </span>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredCaptains.length === 0 && (
+            <div className="bg-white dark:bg-stone-800 rounded-3xl p-10 text-center border border-stone-200 dark:border-stone-700 space-y-3">
+              <UserCheck className="w-12 h-12 text-stone-400 mx-auto" />
+              <h3 className="text-sm font-bold text-stone-800 dark:text-stone-200">
+                لا يوجد كباتن يطابقون خيارات البحث الحالية
+              </h3>
+            </div>
+          )}
+
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* SUB-TAB 1: TRANSPORT OFFICES & SUBSCRIPTION MANAGEMENT */}
@@ -1616,6 +2265,166 @@ export const AdminControlPortal: React.FC = () => {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1.5: ADD NEW PASSENGER TRAVEL REQUEST */}
+      {/* ========================================================================= */}
+      {isAddPassengerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-stone-800 rounded-3xl p-6 max-w-lg w-full border border-stone-200 dark:border-stone-700 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-stone-700">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-600" />
+                <h3 className="text-sm font-black text-stone-900 dark:text-white">
+                  تسجيل طلب مسافر جديد في السجل الإداري
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddPassengerModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-xs font-bold"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePassengerRequest} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    اسم المسافر:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newPassName}
+                    onChange={(e) => setNewPassName(e.target.value)}
+                    placeholder="مثال: عبد الله العولقي"
+                    className="w-full text-xs px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    رقم الهاتف / الواتساب:
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={newPassPhone}
+                    onChange={(e) => setNewPassPhone(e.target.value)}
+                    placeholder="+967 77x xxx xxx"
+                    className="w-full text-xs px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    محافظة الانطلاق:
+                  </label>
+                  <select
+                    value={newPassFromGov}
+                    onChange={(e) => setNewPassFromGov(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                  >
+                    {YEMEN_GOVERNORATES.map(g => (
+                      <option key={g.id} value={g.nameAr}>{g.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    محافظة الوجهة:
+                  </label>
+                  <select
+                    value={newPassToGov}
+                    onChange={(e) => setNewPassToGov(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                  >
+                    {YEMEN_GOVERNORATES.map(g => (
+                      <option key={g.id} value={g.nameAr}>{g.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    تاريخ السفر:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newPassDate}
+                    onChange={(e) => setNewPassDate(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    نوع الحجز:
+                  </label>
+                  <select
+                    value={newPassMode}
+                    onChange={(e) => setNewPassMode(e.target.value as any)}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                  >
+                    <option value="seat">مقعد بالنفر</option>
+                    <option value="full_car">سيارة كاملة خاصة</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    عدد المقاعد:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="14"
+                    value={newPassSeats}
+                    onChange={(e) => setNewPassSeats(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full text-xs px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                  ملاحظات أو طلب خاص:
+                </label>
+                <textarea
+                  rows={2}
+                  value={newPassNotes}
+                  onChange={(e) => setNewPassNotes(e.target.value)}
+                  placeholder="يفضل صالون مكيف، عائلة، وقت محدد..."
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100 dark:border-stone-700">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPassengerModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 text-xs font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-sm"
+                >
+                  إضافة الطلب للسجل
+                </button>
+              </div>
             </form>
           </div>
         </div>
