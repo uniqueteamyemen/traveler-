@@ -1,27 +1,65 @@
-import { InterCityTripListing, SocialCampaignType, SocialCopyTone, SocialPostGenerated, TransportOffice } from '../types/travel';
+import { 
+  InterCityTripListing, 
+  PassengerRideRequest,
+  SocialCampaignType, 
+  SocialCopyTone, 
+  SocialPostGenerated, 
+  TransportOffice,
+  CarouselSlideCard,
+  SocialCarouselPackage
+} from '../types/travel';
+
+export const DEFAULT_WHATSAPP_BOT_NUMBER = '783622340';
+export const DEFAULT_WHATSAPP_DISPLAY = '+967 783 622 340';
+
+export function cleanWhatsAppNumber(phoneInput?: string): string {
+  if (!phoneInput) return '967783622340';
+  const digits = phoneInput.replace(/[^0-9]/g, '');
+  if (!digits) return '967783622340';
+  if (digits.startsWith('967') && digits.length >= 12) return digits;
+  if (digits.startsWith('00967')) return digits.slice(2);
+  if (digits.startsWith('07') && digits.length === 10) return `967${digits.slice(1)}`;
+  if (digits.startsWith('7') && digits.length === 9) return `967${digits}`;
+  return digits;
+}
 
 export interface GeneratePostOptions {
   campaignType: SocialCampaignType;
   tone: SocialCopyTone;
   listing?: InterCityTripListing | null;
+  passengerRequest?: PassengerRideRequest | null;
   office?: TransportOffice | null;
   customTargetRoute?: { from: string; to: string };
   driverBenefitFocus?: 'income_growth' | 'return_trips' | 'family_safety' | 'no_queue';
+  customWhatsAppPhone?: string;
 }
 
 export function generateSocialMediaCampaign(options: GeneratePostOptions): SocialPostGenerated {
-  const { campaignType, tone, listing, office, driverBenefitFocus = 'income_growth' } = options;
+  const { 
+    campaignType, 
+    tone, 
+    listing, 
+    passengerRequest,
+    office, 
+    driverBenefitFocus = 'income_growth',
+    customWhatsAppPhone 
+  } = options;
 
   switch (campaignType) {
     case 'driver_recruitment':
-      return generateDriverRecruitmentPost(tone, driverBenefitFocus, office);
+    case 'captain_campaign_carousel':
+      if (passengerRequest) {
+        return generatePassengerRequestAnnouncementPost(passengerRequest, tone, customWhatsAppPhone);
+      }
+      return generateDriverRecruitmentPost(tone, driverBenefitFocus, office, customWhatsAppPhone);
     case 'passenger_recruitment':
-      return generatePassengerRecruitmentPost(tone, office);
+    case 'passenger_campaign_carousel':
+      return generatePassengerRecruitmentPost(tone, office, customWhatsAppPhone);
     case 'office_showcase':
-      return generateOfficeShowcasePost(office, tone);
+      return generateOfficeShowcasePost(office, tone, customWhatsAppPhone);
     case 'trip_announcement':
     default:
-      return generateTripAnnouncementPost(listing, tone, office);
+      return generateTripAnnouncementPost(listing, tone, office, customWhatsAppPhone);
   }
 }
 
@@ -31,7 +69,8 @@ export function generateSocialMediaCampaign(options: GeneratePostOptions): Socia
 function generateDriverRecruitmentPost(
   tone: SocialCopyTone, 
   focus: string, 
-  office?: TransportOffice | null
+  office?: TransportOffice | null,
+  customWhatsAppPhone?: string
 ): SocialPostGenerated {
   const id = `recruitment-driver-${Date.now()}`;
   const appLink = 'https://traveler.deterministicsolutionsdesign.com/?portal=captains';
@@ -213,7 +252,8 @@ ${hashtags.join(' ')}`,
 // -------------------------------------------------------------
 function generatePassengerRecruitmentPost(
   tone: SocialCopyTone,
-  office?: TransportOffice | null
+  office?: TransportOffice | null,
+  customWhatsAppPhone?: string
 ): SocialPostGenerated {
   const id = `recruitment-passenger-${Date.now()}`;
   const appLink = 'https://traveler.deterministicsolutionsdesign.com/?portal=passenger';
@@ -351,7 +391,8 @@ ${hashtags.join(' ')}`,
 function generateTripAnnouncementPost(
   listing?: InterCityTripListing | null,
   tone: SocialCopyTone = 'authentic_yemeni',
-  office?: TransportOffice | null
+  office?: TransportOffice | null,
+  customWhatsAppPhone?: string
 ): SocialPostGenerated {
   const id = `trip-post-${Date.now()}`;
 
@@ -473,7 +514,8 @@ https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`ال
 // -------------------------------------------------------------
 function generateOfficeShowcasePost(
   office?: TransportOffice | null,
-  tone: SocialCopyTone = 'authentic_yemeni'
+  tone: SocialCopyTone = 'authentic_yemeni',
+  customWhatsAppPhone?: string
 ): SocialPostGenerated {
   const id = `office-showcase-${Date.now()}`;
   const officeName = office?.nameAr || 'شركة راحة للنقل البري الدولي والمحلي';
@@ -544,4 +586,286 @@ ${hashtags.join(' ')}`,
       cardSubheadAr: 'أسطول حديث • رحلات يومية • شحن طرود'
     }
   };
+}
+
+// -------------------------------------------------------------
+// 5. PASSENGER RIDE REQUEST ANNOUNCEMENT (إعلان طلب مسافر / عائلة تبحث عن سيارة)
+// -------------------------------------------------------------
+export function generatePassengerRequestAnnouncementPost(
+  request: PassengerRideRequest,
+  tone: SocialCopyTone = 'authentic_yemeni',
+  customWhatsAppPhone?: string
+): SocialPostGenerated {
+  const id = `passenger-req-post-${request.id || Date.now()}`;
+  const cleanWa = cleanWhatsAppNumber(customWhatsAppPhone || DEFAULT_WHATSAPP_BOT_NUMBER);
+  const from = request.fromGovernorate;
+  const to = request.toGovernorate;
+  const date = request.tripDate;
+  const modeStr = request.bookingMode === 'full_car' ? 'سيارة صالون كاملة (مشوار خاص)' : `${request.passengersCount} مقاعد`;
+  const name = request.passengerName;
+  const notes = request.notes ? `\n📝 ملاحظات: ${request.notes}` : '';
+
+  const waTriggerMsg = `السلام عليكم، أنا كابتن سيارة ومتوجه على خط ${from} إلى ${to} لتاريخ ${date}، وأرغب بتنفيذ طلب مشوار (المسافر: ${name})`;
+  const waUrl = `https://wa.me/${cleanWa}?text=${encodeURIComponent(waTriggerMsg)}`;
+  const appLink = `https://traveler.deterministicsolutionsdesign.com/?portal=captains&request=${request.id}`;
+
+  const hashtags = [
+    '#طلب_سفر_عاجل',
+    '#كباتن_اليمن',
+    `#مشوار_${from.split(' ')[0]}`,
+    `#مشوار_${to.split(' ')[0]}`,
+    '#صوالين_اليمن',
+    '#سفر_اليمن',
+    '#عمولة_صفر'
+  ];
+
+  return {
+    id,
+    type: 'captain_campaign_carousel',
+    title: `إعلان طلب سفر: ${from} إلى ${to} (${modeStr})`,
+    headlineAr: `🔥 مطلوب كابتن فوراً: مسافرين يبحثون عن سيارة من ${from} إلى ${to}!`,
+    bodyTextAr: `يا كباتن اليمن يا أهل الصوالين والباصات.. مشوار جاهز ومباشر بانتظارك:
+📍 خط السير: من ${from} ← إلى ${to}
+🗓️ تاريخ التحرك: ${date}
+💺 نوع الحجز: ${modeStr}
+👤 اسم صاحب الطلب: ${name}${notes}
+
+🎁 ميزات الكابتن مع منصة المسافر:
+• عمولة 0% وتسجيل مجاني 100%.
+• ركابك جاهزين ومحجوزين مسبقاً قبل التحرك من بيتك.
+• كود تتبع عائلي وأمان متكامل لك ولركابك في الطريق.`,
+    callToActionAr: '🚗 متوجه على نفس الخط؟ اضغط الرابط وخذ المشوار فوراً عبر واتساب',
+    hashtags,
+    suggestedEmojis: ['🔥', '🚗', '📍', '🗓️', '💺', '🇾🇪', '📲'],
+    fullFormattedCaption: `🔥🚗 مطلوب كابتن فوراً: مشوار سفر جاهز ومحجوز!
+📍 المسار: من ${from} ← إلى ${to}
+🗓️ التاريخ: ${date}
+💺 الحجز: ${modeStr}
+👤 المسافر: ${name}${notes}
+
+💰 عمولة 0% • لا انتظار بالفرزة • ركاب محجوزين مسبقاً!
+📲 للتواصل وحجز المشوار مباشرة عبر واتساب:
+${waUrl}
+
+👇 رابط تفاصيل الطلب:
+${appLink}
+
+${hashtags.join(' ')}`,
+    formattedWhatsAppMsg: `*🔥🚗 مطلوب كابتن فوراً عبر منصة المسافر:*
+*المسار:* من ${from} ← إلى ${to}
+*الموعد:* ${date}
+*نوع الحجز:* ${modeStr}
+*المسافر:* ${name}
+${notes}
+
+لأخذ المشوار والتواصل المباشر:
+${waUrl}`,
+    facebookPostText: `🔥🚗 مطلوب كابتن فوراً:
+مشوار سفر مباشر من ${from} إلى ${to}
+🗓️ موعد التحرك: ${date}
+💺 المطلوب: ${modeStr}
+👤 المسافر: ${name}
+💰 عمولة 0% وبدون سماسرة!
+للتواصل المباشر عبر واتساب:
+${waUrl}`,
+    twitterPostText: `🔥 مطلوب كابتن من ${from} إلى ${to}
+🗓️ التاريخ: ${date} | 💺 ${modeStr}
+عمولة 0% وركاب محجوزين مسبقاً!
+للتواصل عبر واتساب: ${waUrl}
+#كباتن_اليمن #سفر_اليمن`,
+    telegramPostText: `🔥 *مطلوب كابتن فوراً:*
+من ${from} ← إلى ${to}
+🗓️ ${date} | 💺 ${modeStr}
+للتواصل: ${waUrl}`,
+    visualTheme: {
+      bgGradient: 'from-amber-700 via-stone-900 to-stone-950',
+      accentColor: '#f59e0b',
+      badgeTextAr: '🔥 مطلوب كابتن فوراً • عمولة 0%',
+      cardSubheadAr: `مشوار من ${from} إلى ${to}`
+    }
+  };
+}
+
+// -------------------------------------------------------------
+// 6. CAROUSEL ADS SUITE GENERATOR (مولد حزم إعلانات الكاروسيل للشرائح المتحركة)
+// -------------------------------------------------------------
+export interface GenerateCarouselPackageOptions {
+  audience: 'passengers' | 'captains';
+  listings: InterCityTripListing[];
+  requests: PassengerRideRequest[];
+  whatsappPhone?: string;
+  tone?: SocialCopyTone;
+}
+
+export function generateCarouselAdPackage(options: GenerateCarouselPackageOptions): SocialCarouselPackage {
+  const { 
+    audience, 
+    listings = [], 
+    requests = [], 
+    whatsappPhone = DEFAULT_WHATSAPP_BOT_NUMBER,
+    tone = 'authentic_yemeni' 
+  } = options;
+
+  const cleanWa = cleanWhatsAppNumber(whatsappPhone);
+  const now = new Date().toISOString();
+
+  if (audience === 'passengers') {
+    // PASSENGER CAMPAIGN: Filter active, non-full listings
+    const activeListings = listings
+      .filter(l => (l.availableSeats ?? 1) > 0)
+      .slice(0, 5); // Take up to 5 top active trips
+
+    const slides: CarouselSlideCard[] = [];
+
+    // Slide 1: Main Brand Cover (ثابت الهوية والأمان العائلي)
+    const coverWaMsg = `السلام عليكم منصة ترافلر (Traveler)، أرغب بالاستفسار عن الرحلات المتوفرة وحجز مقعد`;
+    slides.push({
+      id: 'slide-cov-pass',
+      slideNumber: 1,
+      isCoverSlide: true,
+      badgeAr: 'منصة ترافلر اليمنية (Traveler) 🇾🇪 • 22 محافظة',
+      headlineAr: 'سافر براحة وأمان عائلي متكامل بين كافة المحافظات اليمنية ✨',
+      ctaButtonTextAr: 'اسحب لمشاهدة الرحلات المتاحة ⬅️',
+      whatsappMessageText: coverWaMsg,
+      whatsappDeepLink: `https://wa.me/${cleanWa}?text=${encodeURIComponent(coverWaMsg)}`,
+      fallbackWebUrl: 'https://traveler.deterministicsolutionsdesign.com/?portal=passenger',
+      highlightPoints: [
+        '🎁 تسجيل وحجز مجاني 100% بدون عمولات سماسرة',
+        '🛰️ تتبع عائلي مباشر برمز مشفر يشارك موقعك مع أهلك',
+        '🚙 ضمان المركبة البديلة المعتمدة في كافة العقبات',
+        '💺 خيارات حجز بالنفر أو استئجار صالون كامل لخصوصيتك'
+      ]
+    });
+
+    // Slides 2..N: Dynamic Active Trips (Booking.com Style)
+    activeListings.forEach((listing, idx) => {
+      const from = listing.fromGovernorate;
+      const to = listing.toGovernorate;
+      const date = listing.departureDate || 'قريباً';
+      const time = listing.departureTime || 'صباحاً';
+      const vehicle = listing.vehicleModel || 'صالون مكيف حديث';
+      const seats = listing.availableSeats;
+      const price = listing.pricePerSeat ? `${listing.pricePerSeat.toLocaleString()} ${listing.currency}` : 'سعر رسمي شفاف';
+      const tracking = listing.familyTrackingCode || `YEM-${from.slice(0, 2)}-${idx + 100}`;
+      const driver = listing.driverName || 'كابتن معتمد';
+
+      const tripWaMsg = `السلام عليكم منصة ترافلر (Traveler)، أرغب بحجز مقعد في رحلة: من ${from} إلى ${to} (الموعد: ${date} - ${time} - كود الأمان ${tracking})`;
+
+      slides.push({
+        id: `slide-trip-${listing.id || idx}`,
+        slideNumber: idx + 2,
+        isCoverSlide: false,
+        badgeAr: `رحلة معتمدة • متبقي ${seats} مقاعد 💺`,
+        headlineAr: `من ${from} ← إلى ${to}`,
+        routeFrom: from,
+        routeTo: to,
+        dateStr: date,
+        timeStr: time,
+        vehicleModel: vehicle,
+        seatsInfo: `${seats} مقاعد شاغرة`,
+        priceOrBudget: price,
+        safetyOrTrackingCode: tracking,
+        driverOrRequesterName: driver,
+        ctaButtonTextAr: '📲 احجز هذا المقعد فوراً عبر واتساب',
+        whatsappMessageText: tripWaMsg,
+        whatsappDeepLink: `https://wa.me/${cleanWa}?text=${encodeURIComponent(tripWaMsg)}`,
+        fallbackWebUrl: `https://traveler.deterministicsolutionsdesign.com/?portal=passenger&trip=${listing.id}`,
+        highlightPoints: [
+          `🗓️ موعد التحرك: ${date} (${time})`,
+          `🚙 المركبة: ${vehicle}`,
+          `💵 السعر للمقعد: ${price}`,
+          `🔒 كود التتبع العائلي: ${tracking}`
+        ]
+      });
+    });
+
+    return {
+      id: `carousel-passenger-${Date.now()}`,
+      audience: 'passengers',
+      campaignTitleAr: 'حملة المسافرين والعائلات — منصة ترافلر (Traveler)',
+      totalSlides: slides.length,
+      slides,
+      metaPostCaptionAr: `👨‍👩‍👧‍👦✨ مسافر بين المحافظات اليمنية؟ سفرتك الآن بأعلى درجات الأمان والراحة مع منصة «ترافلر (Traveler)»!
+🎁 [التسجيل واستخدام التطبيق مجاني بالكامل للمسافرين]
+اسحب الشرائح لتصفح الرحلات المتاحة واحجز مقعدك مباشرة عبر واتساب بضغطة زر واحدة 👇
+واتساب مباشر: https://wa.me/${cleanWa}`,
+      hashtags: ['#ترافلر_اليمن', '#سفر_اليمن', '#حجز_رحلات', '#أمان_العائلة', '#تتبع_حي', '#صنعاء_عدن_حضرموت', '#تسجيل_مجاني'],
+      createdAt: now
+    };
+  } else {
+    // CAPTAINS CAMPAIGN: Filter active requests from passengers
+    const activeRequests = requests
+      .filter(r => r.status === 'new' || !r.status)
+      .slice(0, 5); // Take up to 5 top active requests
+
+    const slides: CarouselSlideCard[] = [];
+
+    // Slide 1: Main Brand Cover for Captains
+    const coverWaMsg = `السلام عليكم إدارة ترافلر (Traveler)، أنا كابتن سيارة وأرغب باستقبال طلبات المسافرين وملء رحلات الراجع`;
+    slides.push({
+      id: 'slide-cov-cap',
+      slideNumber: 1,
+      isCoverSlide: true,
+      badgeAr: 'منظومة ترافلر للكباتن (Traveler) 🚗 • تسجيل مجاني',
+      headlineAr: 'يا كباتن اليمن يا أهل الصوالين.. ركابك جاهزين ومحجوزين مع منصة ترافلر قبل ما تدق سلف! 🇾🇪',
+      ctaButtonTextAr: 'اسحب لمشاهدة طلبات الركاب المفتوحة ⬅️',
+      whatsappMessageText: coverWaMsg,
+      whatsappDeepLink: `https://wa.me/${cleanWa}?text=${encodeURIComponent(coverWaMsg)}`,
+      fallbackWebUrl: 'https://traveler.deterministicsolutionsdesign.com/?portal=captains',
+      highlightPoints: [
+        '🎁 تسجيل مجاني 100% بدون أي رسوم أو عمولات خفية',
+        '💰 وداعاً للرجوع فاضي: تعبئة ذكية لرحلات الراجع الشاغرة',
+        '🛡️ كود تتبع وخطة سير تحميك وتحمي ركابك في النقاط',
+        '📞 فريق دعم فني يمني متواجد معك على مدار 24/7'
+      ]
+    });
+
+    // Slides 2..N: Dynamic Active Passenger Requests (Dispatch Style)
+    activeRequests.forEach((req, idx) => {
+      const from = req.fromGovernorate;
+      const to = req.toGovernorate;
+      const date = req.tripDate || 'عاجل';
+      const modeStr = req.bookingMode === 'full_car' ? 'مطلوب صالون كامل (مشوار خاص)' : `مطلوب ${req.passengersCount} مقاعد`;
+      const name = req.passengerName || 'عائلة مسافرة';
+
+      const reqWaMsg = `السلام عليكم إدارة ترافلر (Traveler)، أنا كابتن سيارة ومتوجه على خط ${from} إلى ${to} لتاريخ ${date}، وأرغب بتنفيذ طلب مشوار (المسافر: ${name})`;
+
+      slides.push({
+        id: `slide-req-${req.id || idx}`,
+        slideNumber: idx + 2,
+        isCoverSlide: false,
+        badgeAr: '🔥 طلب سفر جاهز للتنفيذ • عمولة 0%',
+        headlineAr: `من ${from} ← إلى ${to}`,
+        routeFrom: from,
+        routeTo: to,
+        dateStr: date,
+        seatsInfo: modeStr,
+        driverOrRequesterName: name,
+        ctaButtonTextAr: '🚗 أنا متوجه.. خذ هذا المشوار عبر واتساب',
+        whatsappMessageText: reqWaMsg,
+        whatsappDeepLink: `https://wa.me/${cleanWa}?text=${encodeURIComponent(reqWaMsg)}`,
+        fallbackWebUrl: `https://traveler.deterministicsolutionsdesign.com/?portal=captains&request=${req.id}`,
+        highlightPoints: [
+          `🗓️ موعد التحرك المطلوب: ${date}`,
+          `💺 المطلوب: ${modeStr}`,
+          `👤 المسافر: ${name}`,
+          `💰 مشوار مباشر ومضمون • بدون وسيط ولا فرزة`
+        ]
+      });
+    });
+
+    return {
+      id: `carousel-captain-${Date.now()}`,
+      audience: 'captains',
+      campaignTitleAr: 'حملة الكباتن وأصحاب السيارات — منصة ترافلر (Traveler)',
+      totalSlides: slides.length,
+      slides,
+      metaPostCaptionAr: `🚗🇾🇪 يا كباتن اليمن يا راعي الصالون والباص..
+انضم لمنصة «ترافلر (Traveler)».. التسجيل مجاني 100% والركاب بانتظارك مسبقاً!
+اسحب الشرائح وتصفح طلبات المشاوير المفتوحة وتواصل فوراً لأخذ الركاب بضغطة زر 👇
+واتساب الإدارة: https://wa.me/${cleanWa}`,
+      hashtags: ['#ترافلر_اليمن', '#كباتن_اليمن', '#سائقين_اليمن', '#صوالين_اليمن', '#سفر_اليمن', '#خط_صنعاء_عدن', '#تسجيل_مجاني'],
+      createdAt: now
+    };
+  }
 }

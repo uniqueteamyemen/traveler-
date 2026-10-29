@@ -1,11 +1,12 @@
 import React from 'react';
-import { InterCityTripListing, SocialCampaignType, TransportOffice } from '../../types/travel';
+import { InterCityTripListing, PassengerRideRequest, SocialCampaignType, TransportOffice } from '../../types/travel';
 import { SocialMediaAutomator } from '../SocialMediaAutomator';
 
 interface SocialMediaAutoPosterModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialListing?: InterCityTripListing | null;
+  initialPassengerRequest?: PassengerRideRequest | null;
   initialOffice?: TransportOffice | null;
   initialCampaignType?: SocialCampaignType;
 }
@@ -14,8 +15,9 @@ export const SocialMediaAutoPosterModal: React.FC<SocialMediaAutoPosterModalProp
   isOpen,
   onClose,
   initialListing,
+  initialPassengerRequest,
   initialOffice,
-  initialCampaignType = 'driver_recruitment'
+  initialCampaignType = 'passenger_campaign_carousel'
 }) => {
   if (!isOpen) return null;
 
@@ -30,6 +32,7 @@ export const SocialMediaAutoPosterModal: React.FC<SocialMediaAutoPosterModalProp
       >
         <SocialMediaAutomator
           initialListing={initialListing}
+          initialPassengerRequest={initialPassengerRequest}
           initialOffice={initialOffice}
           initialCampaignType={initialCampaignType}
           onClose={onClose}
@@ -39,3 +42,4 @@ export const SocialMediaAutoPosterModal: React.FC<SocialMediaAutoPosterModalProp
     </div>
   );
 };
+

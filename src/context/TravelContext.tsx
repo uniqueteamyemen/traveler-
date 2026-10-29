@@ -44,6 +44,13 @@ import {
   INITIAL_ROAD_PASSES 
 } from '../services/firebaseService';
 import { FirebaseUser, auth, signInAnonymously } from '../lib/firebase';
+import { 
+  AutoAdDispatcherState, 
+  loadAutoAdState, 
+  saveAutoAdState, 
+  evaluateAndTriggerAutoAd, 
+  recordNewActivity 
+} from '../services/autoAdSchedulerService';
 
 export type { TabType, PortalMode };
 
@@ -191,6 +198,11 @@ interface TravelContextType {
   // Stories
   addStory: (tripId: string, story: Omit<StoryEntry, 'id'>) => void;
   deleteStory: (tripId: string, storyId: string) => void;
+
+  // Automated Meta & WhatsApp Ads Dispatcher (2 hours / 5 requests rule)
+  autoAdState: AutoAdDispatcherState;
+  triggerManualAdDispatch: (audience?: 'passengers' | 'captains') => void;
+  toggleAutoAdDispatcher: (enabled?: boolean) => void;
 }
 
 const TravelContext = createContext<TravelContextType | undefined>(undefined);
@@ -603,6 +615,30 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+
+  // Automated Meta & WhatsApp Ads Dispatcher State (2 hours / 5 requests rule)
+  const [autoAdState, setAutoAdState] = useState<AutoAdDispatcherState>(() => loadAutoAdState());
+
+  useEffect(() => {
+    // Check every 60 seconds if the 2-hour window has elapsed
+    const interval = setInterval(() => {
+      const res = evaluateAndTriggerAutoAd(intercityListings, passengerRequests);
+      if (res.triggered) {
+        setAutoAdState(res.state);
+        addNotification({
+          title: 'Automated Meta & WhatsApp Ad Staged',
+          titleAr: '🚀 تم إعداد حزمة إعلانات ترافلر تلقائياً (مرور ساعتين)',
+          message: `Dynamic ad package generated for ${res.newPackage?.audience === 'captains' ? 'Captains' : 'Passengers'}.`,
+          messageAr: `مرت ساعتان: تم توليد وتحديث حزمة إعلانات كاروسيل ترافلر (${res.newPackage?.audience === 'captains' ? 'الكباتن' : 'الركاب'}) تحوي ${res.newPackage?.totalSlides} بطاقات متزامنة بروابط واتساب (+967 783 622 340).`,
+          type: 'general',
+          priority: 'medium',
+          targetTab: 'admin_control'
+        });
+      }
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [intercityListings, passengerRequests]);
 
   useEffect(() => {
     try {
@@ -1373,7 +1409,24 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       createdAt: new Date().toISOString()
     };
-    setPassengerRequests(prev => [newReq, ...prev]);
+    const nextList = [newReq, ...passengerRequests];
+    setPassengerRequests(nextList);
+
+    // Auto Ad Rule Evaluation (Every 5 requests / listings or 2 hours)
+    const adResult = recordNewActivity(intercityListings, nextList);
+    setAutoAdState(adResult.state);
+    if (adResult.triggered) {
+      addNotification({
+        title: 'Auto Ads Triggered (5 Requests Threshold Hit)',
+        titleAr: '📢 اكتمال 5 طلبات: تم تجهيز حزمة إعلانات ترافلر تلقائياً!',
+        message: `Staged carousel package ready for ${adResult.newPackage?.audience === 'captains' ? 'Captains' : 'Passengers'}.`,
+        messageAr: `بلغ عدد الطلبات غير المعلنة 5 طلبات: تم تجميع وتجهيز حزمة إعلانات ممولة جديدة (${adResult.newPackage?.audience === 'captains' ? 'استقطاب كباتن لتلبية طلبات الركاب' : 'استقطاب ركاب للحجز'}) تلقائياً.`,
+        type: 'general',
+        priority: 'high',
+        targetTab: 'admin_control'
+      });
+    }
+
     addNotification({
       title: 'Passenger Travel Request Logged',
       titleAr: `تم تسجيل طلب سفر جديد: (${newReq.fromGovernorate} ← ${newReq.toGovernorate})`,
@@ -1595,8 +1648,24 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       conflictNotice: finalConflictNotice
     };
 
-    setIntercityListings(prev => [newListing, ...prev]);
+    const nextListings = [newListing, ...intercityListings];
+    setIntercityListings(nextListings);
     listingsService.addListing(newListing).catch(console.warn);
+
+    // Auto Ad Rule Evaluation (Every 5 requests / listings or 2 hours)
+    const adResult = recordNewActivity(nextListings, passengerRequests);
+    setAutoAdState(adResult.state);
+    if (adResult.triggered) {
+      addNotification({
+        title: 'Auto Ads Triggered (5 Activities Threshold Hit)',
+        titleAr: '📢 اكتمال 5 عروض: تم تجهيز حزمة إعلانات ترافلر تلقائياً!',
+        message: `Staged carousel package ready for ${adResult.newPackage?.audience === 'captains' ? 'Captains' : 'Passengers'}.`,
+        messageAr: `تم تجميع حزمة إعلانات ترافلر تلقائياً بعد اكتمال 5 عروض جديدة للمنصة لترويجها على فيسبوك وإنستغرام وبوت الواتساب.`,
+        type: 'general',
+        priority: 'high',
+        targetTab: 'admin_control'
+      });
+    }
   };
 
   const processDriverSMS = (smsText: string, senderPhone?: string): ParsedSMSResult => {
@@ -2140,6 +2209,27 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }));
   };
 
+  const triggerManualAdDispatch = (audience?: 'passengers' | 'captains') => {
+    const res = evaluateAndTriggerAutoAd(intercityListings, passengerRequests, 'manual_admin');
+    setAutoAdState(res.state);
+    addNotification({
+      title: 'Manual Ad Batch Generated',
+      titleAr: '⚡ تم توليد حزمة إعلانات ترافلر فورياً بطلب المشرف',
+      message: `Admin triggered ad compilation: ${res.newPackage?.totalSlides} cards ready.`,
+      messageAr: `تم تحديث وتجميع بطاقات الإعلانات وروابط واتساب فوراً من بيانات الرحلات والطلبات الحالية بنجاح.`,
+      type: 'general',
+      priority: 'medium',
+      targetTab: 'admin_control'
+    });
+  };
+
+  const toggleAutoAdDispatcher = (enabled?: boolean) => {
+    const nextEnabled = enabled !== undefined ? enabled : !autoAdState.isEnabled;
+    const nextState = { ...autoAdState, isEnabled: nextEnabled };
+    saveAutoAdState(nextState);
+    setAutoAdState(nextState);
+  };
+
   return (
     <TravelContext.Provider
       value={{
@@ -2149,6 +2239,9 @@ export const TravelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setActiveTripId,
         activeTab,
         setActiveTab,
+        autoAdState,
+        triggerManualAdDispatch,
+        toggleAutoAdDispatcher,
         portalMode,
         setPortalMode,
         lang,

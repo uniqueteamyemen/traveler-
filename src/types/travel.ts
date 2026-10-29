@@ -515,9 +515,49 @@ export interface TransportOffice {
 }
 
 // ==================== AI SOCIAL MEDIA POSTS & MARKETING ====================
-export type SocialCampaignType = 'driver_recruitment' | 'passenger_recruitment' | 'trip_announcement' | 'office_showcase';
-export type SocialPlatform = 'instagram_post' | 'instagram_story' | 'facebook_feed' | 'whatsapp_broadcast' | 'twitter_x' | 'telegram_channel';
+export type SocialCampaignType = 
+  | 'passenger_campaign_carousel' 
+  | 'captain_campaign_carousel' 
+  | 'driver_recruitment' 
+  | 'passenger_recruitment' 
+  | 'trip_announcement' 
+  | 'office_showcase';
+
+export type SocialPlatform = 'instagram_post' | 'instagram_story' | 'facebook_feed' | 'facebook_carousel' | 'whatsapp_broadcast' | 'twitter_x' | 'telegram_channel';
 export type SocialCopyTone = 'authentic_yemeni' | 'professional_saas' | 'action_urgent' | 'family_safety';
+
+export interface CarouselSlideCard {
+  id: string;
+  slideNumber: number;
+  isCoverSlide?: boolean;
+  badgeAr: string;
+  headlineAr: string;
+  routeFrom?: string;
+  routeTo?: string;
+  dateStr?: string;
+  timeStr?: string;
+  vehicleModel?: string;
+  seatsInfo?: string;
+  priceOrBudget?: string;
+  safetyOrTrackingCode?: string;
+  driverOrRequesterName?: string;
+  ctaButtonTextAr: string;
+  whatsappMessageText: string;
+  whatsappDeepLink: string;
+  fallbackWebUrl: string;
+  highlightPoints: string[];
+}
+
+export interface SocialCarouselPackage {
+  id: string;
+  audience: 'passengers' | 'captains';
+  campaignTitleAr: string;
+  totalSlides: number;
+  slides: CarouselSlideCard[];
+  metaPostCaptionAr: string;
+  hashtags: string[];
+  createdAt: string;
+}
 
 export interface SocialPostGenerated {
   id: string;

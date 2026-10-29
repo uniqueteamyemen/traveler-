@@ -7,7 +7,8 @@ import {
   OfficeSubscriptionTier, 
   OfficeSubscriptionStatus,
   InterCityTripListing,
-  PassengerRideRequest
+  PassengerRideRequest,
+  SocialCampaignType
 } from '../types/travel';
 import { CompanyShowcaseModal } from './modals/CompanyShowcaseModal';
 import { SocialMediaAutoPosterModal } from './modals/SocialMediaAutoPosterModal';
@@ -87,7 +88,10 @@ export const AdminControlPortal: React.FC = () => {
     authError,
     clearAuthError,
     adminMasterPin,
-    updateAdminMasterPin
+    updateAdminMasterPin,
+    autoAdState,
+    triggerManualAdDispatch,
+    toggleAutoAdDispatcher
   } = useTravel();
 
   // Admin Login & PIN Security State
@@ -158,8 +162,11 @@ export const AdminControlPortal: React.FC = () => {
   const [selectedOffice, setSelectedOffice] = useState<TransportOffice | null>(null);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
 
-  // Social Auto-Poster Modal
+  // Social Auto-Poster Modal & Carousel Studio
   const [socialOffice, setSocialOffice] = useState<TransportOffice | null>(null);
+  const [socialListing, setSocialListing] = useState<InterCityTripListing | null>(null);
+  const [socialRequest, setSocialRequest] = useState<PassengerRideRequest | null>(null);
+  const [socialCampaignType, setSocialCampaignType] = useState<SocialCampaignType>('passenger_campaign_carousel');
   const [isSocialModalOpen, setIsSocialModalOpen] = useState(false);
 
   // Subscription Edit Modal
@@ -638,6 +645,13 @@ export const AdminControlPortal: React.FC = () => {
     );
   }
 
+  // Auto Ad Dispatcher countdown metrics (2 hours / 5 requests)
+  const elapsedMs = Date.now() - (autoAdState?.lastTriggerTimestamp || Date.now());
+  const remainingMs = Math.max(0, (autoAdState?.timeThresholdMs || 7200000) - elapsedMs);
+  const remainingMinutes = Math.floor(remainingMs / 60000);
+  const remainingHours = Math.floor(remainingMinutes / 60);
+  const remainingMinsFormatted = remainingMinutes % 60;
+
   return (
     <div className="space-y-6">
       
@@ -670,6 +684,20 @@ export const AdminControlPortal: React.FC = () => {
               >
                 <Key className="w-3 h-3 text-amber-400" />
                 <span>تغيير الرمز السري (PIN)</span>
+              </button>
+              <button
+                onClick={() => {
+                  setSocialCampaignType('passenger_campaign_carousel');
+                  setSocialOffice(null);
+                  setSocialListing(null);
+                  setSocialRequest(null);
+                  setIsSocialModalOpen(true);
+                }}
+                className="px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 font-black text-xs flex items-center gap-1.5 transition shadow-md shadow-amber-500/20"
+                title="فتح استوديو إعلانات الكاروسيل لفيسبوك وإنستغرام وبوت الواتساب"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-stone-950" />
+                <span>استوديو إعلانات Meta وواتساب 📢</span>
               </button>
               <button
                 onClick={async () => {
@@ -719,6 +747,137 @@ export const AdminControlPortal: React.FC = () => {
               <span className="text-[10px] text-purple-300 block font-medium">رسوم الاشتراكات</span>
               <span className="text-xs font-black text-purple-300 truncate block mt-1">
                 {totalMonthlyRevYER.toLocaleString()} YER
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* AUTOMATED META & WHATSAPP ADS DISPATCHER MONITOR (ترافلر) */}
+        {/* ========================================================================= */}
+        <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-stone-900/95 via-stone-850/95 to-stone-900/95 border border-amber-500/30 shadow-lg text-stone-100">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            
+            <div className="space-y-1.5 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>محرك الأتمتة الإعلانية الذكية (منصة ترافلر)</span>
+                </span>
+                
+                {autoAdState.isEnabled ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>الأتمتة نشطة تلقائياً</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-stone-700 text-stone-300 text-[10px] font-bold">
+                    الأتمتة معطلة مؤقتاً
+                  </span>
+                )}
+
+                <span className="text-[11px] text-stone-400">
+                  قاعدة الجدولة: <strong className="text-amber-300">كل ساعتين</strong> أو <strong className="text-amber-300">كل 5 طلبات/عروض</strong> (أيهما أولاً)
+                </span>
+              </div>
+
+              <p className="text-xs text-stone-300 leading-relaxed">
+                تم إلغاء أزرار النشر الفردية تفادياً لتحميلك تكاليف عشوائية. يقوم المحرك التلقائي دورياً بتجميع الطلبات والرحلات النشطة في حزم كاروسيل ممولة بأسلوب بطاقات الحجز الذكية، مع ربط كل شريحة ببوت الواتساب المركزي (<span className="text-emerald-400 font-mono font-bold" dir="ltr">+967 783 622 340</span>) ونطاق الويب الرسمي (<span className="text-amber-300 font-mono font-bold" dir="ltr">traveler.deterministicsolutionsdesign.com</span>).
+              </p>
+            </div>
+
+            {/* Quick Automation Actions */}
+            <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+              <button
+                onClick={() => {
+                  setSocialCampaignType(autoAdState.lastDispatchedAudience === 'captains' ? 'captain_campaign_carousel' : 'passenger_campaign_carousel');
+                  setSocialOffice(null);
+                  setSocialListing(null);
+                  setSocialRequest(null);
+                  setIsSocialModalOpen(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm"
+                title="معاينة حزمة الكاروسيل الحالية وتصدير بطاقاتها وروابطها"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>معاينة وتصدير الحزمة 🎨</span>
+              </button>
+
+              <button
+                onClick={() => triggerManualAdDispatch()}
+                className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition"
+                title="تحديث وتوليد حزمة إعلانات الآن فوراً من البيانات الحالية"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                <span>توليد دفعة فورية ⚡</span>
+              </button>
+
+              <button
+                onClick={() => toggleAutoAdDispatcher()}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                  autoAdState.isEnabled 
+                    ? 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700' 
+                    : 'bg-emerald-600 text-white border-emerald-500'
+                }`}
+                title={autoAdState.isEnabled ? 'إيقاف مؤقت للأتمتة' : 'تشغيل الأتمتة'}
+              >
+                {autoAdState.isEnabled ? 'إيقاف' : 'تشغيل'}
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Indicators & State Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 pt-3 border-t border-white/10 text-xs">
+            {/* Condition 1: Volume progress */}
+            <div className="bg-stone-800/60 p-2.5 rounded-xl border border-white/5">
+              <div className="flex items-center justify-between text-stone-300 mb-1.5">
+                <span className="font-bold">مقياس الحجم (5 طلبات)</span>
+                <span className="font-black text-amber-400 font-mono">
+                  {autoAdState.unadvertisedVolumeCount} / {autoAdState.volumeThreshold}
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-stone-700 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300 rounded-full"
+                  style={{ width: `${Math.min(100, (autoAdState.unadvertisedVolumeCount / autoAdState.volumeThreshold) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-stone-400 block mt-1">
+                {autoAdState.unadvertisedVolumeCount >= autoAdState.volumeThreshold 
+                  ? 'تم اكتمال العتبة وسيتم الإطلاق التلقائي'
+                  : `متبقي ${autoAdState.volumeThreshold - autoAdState.unadvertisedVolumeCount} طلبات/عروض للدفعة التلقائية`}
+              </span>
+            </div>
+
+            {/* Condition 2: Time progress */}
+            <div className="bg-stone-800/60 p-2.5 rounded-xl border border-white/5">
+              <div className="flex items-center justify-between text-stone-300 mb-1">
+                <span className="font-bold">المؤقت الدوري (ساعتان)</span>
+                <span className="font-black text-emerald-400 font-mono flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {remainingHours > 0 ? `${remainingHours} س و ` : ''}{remainingMinsFormatted} د
+                </span>
+              </div>
+              <span className="text-[10px] text-stone-400 block mt-1">
+                آخر دورة تم تجهيزها: {autoAdState.lastDispatchedAt 
+                  ? new Date(autoAdState.lastDispatchedAt).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' }) 
+                  : 'منذ قليل'}
+              </span>
+            </div>
+
+            {/* Dynamic Audience & Staged Package */}
+            <div className="bg-stone-800/60 p-2.5 rounded-xl border border-white/5">
+              <div className="flex items-center justify-between text-stone-300 mb-1">
+                <span className="font-bold">الحزمة الحالية المجهزة</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+                  {autoAdState.lastDispatchedAudience === 'captains' ? 'جمهور الكباتن 🚗' : 'جمهور المسافرين 👥'}
+                </span>
+              </div>
+              <div className="text-[11px] text-stone-300 truncate font-semibold">
+                {autoAdState.latestPackage?.campaignTitleAr || 'حزمة ترافلر الترويجية المتزامنة'}
+              </div>
+              <span className="text-[10px] text-stone-400 block mt-0.5">
+                تتضمن {autoAdState.latestPackage?.totalSlides || 5} بطاقات تفاعلية Booking-style
               </span>
             </div>
           </div>
@@ -1424,17 +1583,6 @@ export const AdminControlPortal: React.FC = () => {
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>معاينة البروفايل</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setSocialOffice(office);
-                            setIsSocialModalOpen(true);
-                          }}
-                          className="text-[11px] text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>مولد إعلانات المكتب</span>
                         </button>
 
                         <button
@@ -2791,13 +2939,20 @@ export const AdminControlPortal: React.FC = () => {
         />
       )}
 
-      {/* Social Poster Modal */}
-      {socialOffice && (
+      {/* Social Poster & Meta Carousel Ads Modal */}
+      {isSocialModalOpen && (
         <SocialMediaAutoPosterModal
           isOpen={isSocialModalOpen}
-          onClose={() => setIsSocialModalOpen(false)}
+          onClose={() => {
+            setIsSocialModalOpen(false);
+            setSocialOffice(null);
+            setSocialListing(null);
+            setSocialRequest(null);
+          }}
           initialOffice={socialOffice}
-          initialCampaignType="driver_recruitment"
+          initialListing={socialListing}
+          initialPassengerRequest={socialRequest}
+          initialCampaignType={socialCampaignType}
         />
       )}
 
